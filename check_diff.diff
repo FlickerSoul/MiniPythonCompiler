@@ -1,0 +1,2231 @@
+Common subdirectories: ./.git and ../dwislpy-v2/.git
+Only in ../dwislpy-v2: .gitignore
+Only in ../dwislpy-v2: .idea
+diff --color ./Makefile ../dwislpy-v2/Makefile
+22c22
+< dwislpy: dwislpy-flex.o dwislpy-bison.tab.o dwislpy-main.o dwislpy-ast.o dwislpy-check.o dwislpy-util.o 
+---
+> dwislpy: dwislpy-flex.o dwislpy-bison.tab.o dwislpy-main.o dwislpy-ast.o dwislpy-util.o 
+32c32
+< dwislpy-bison.tab.cc: dwislpy-bison.yy dwislpy-ast.hh dwislpy-check.hh dwislpy-util.hh dwislpy-main.hh
+---
+> dwislpy-bison.tab.cc: dwislpy-bison.yy dwislpy-ast.hh dwislpy-util.hh dwislpy-main.hh
+41,42d40
+< dwislpy-ast.o: dwislpy-check.hh
+< 
+46,47d43
+< 		touch stack.hh position.hh location.hh
+< 		rm -f stack.hh position.hh location.hh
+Only in ../dwislpy-v2: call.py
+Only in ../dwislpy-v2: call_fn.py
+Only in .: check_diff.txt
+Only in ../dwislpy-v2: dummy.py
+diff --color ./dwislpy-ast.cc ../dwislpy-v2/dwislpy-ast.cc
+0a1
+> #include <optional>
+11,12d11
+< #include <variant>
+< #include <optional>
+16d14
+< #include "dwislpy-check.hh"
+17a16,17
+> const std::string DEFAULT_INDENT_STR = "    ";
+> 
+94,106c94,95
+<     main->exec(defs,main_ctxt);
+< }
+< 
+< std::optional<Valu> Defn::call(const Defs& defs,
+<                                const Expn_vec& args,
+<                                const Ctxt& ctxt) {
+<     Ctxt locals {};
+<     int i=0;
+<     for (Expn_ptr expn : args) {
+<         std::string local = formal(i)->name;
+<         i++;
+<         Valu value = expn->eval(defs,ctxt);
+<         locals[local] = value;
+---
+>     if (main) {
+>         main->exec(defs,main_ctxt);
+108d96
+<     return body->exec(defs, locals);
+110a99
+> 
+127,132d115
+< std::optional<Valu> Ntro::exec(const Defs& defs,
+<                                Ctxt& ctxt) const {
+<     ctxt[name] = expn->eval(defs,ctxt);
+<     return std::nullopt;
+< }
+< 
+140c123,129
+<     std::cout << to_string(expn->eval(defs,ctxt)) << std::endl;
+---
+>     if (expns.size()) {
+>         std::cout << to_string(expns[0]->eval(defs,ctxt));
+>     }
+>     for (size_t i = 1; i < expns.size(); i++) {
+>         std::cout << " " << to_string(expns[i]->eval(defs,ctxt));
+>     }
+>     std::cout << std::endl;
+144,148c133,141
+< std::optional<Valu> PCll::exec(const Defs& defs, Ctxt& ctxt) const {
+<     if (defs.count(name) == 0) {
+<         std::string msg = "Run-time error: procedure '" + name +"'";
+<         msg += " is not defined.";
+<         throw DwislpyError { where(), msg };
+---
+> std::optional<Valu> Pleq::exec(const Defs& defs, Ctxt& ctxt) const {
+>     Valu& val = ctxt[name];
+> 
+>     if (std::holds_alternative<int>(val)) {
+>         ctxt[name] = Valu(std::get<int>(val) + std::get<int>(expn->eval(defs,ctxt)));
+>     } else if (std::holds_alternative<std::string>(val)) {
+>         ctxt[name] = Valu(std::get<std::string>(val) + std::get<std::string>(expn->eval(defs,ctxt)));
+>     } else if (std::holds_alternative<bool>(val)) {
+>         ctxt[name] = Valu(std::get<bool>(val) + std::get<bool>(expn->eval(defs,ctxt)));
+150,154c143,155
+<     Defn_ptr defn = defs.at(name);
+<     if (defn->arity() != params.size()) {
+<         std::string msg = "Run-time error: wrong number of arguments to ";
+<         msg += "procedure '" + name +"'.";
+<         throw DwislpyError { where(), msg };
+---
+>     return std::nullopt;
+> }
+> 
+> 
+> std::optional<Valu> Mneq::exec(const Defs& defs, Ctxt& ctxt) const {
+>     Valu& val = ctxt[name];
+> 
+>     if (std::holds_alternative<int>(val)) {
+>         ctxt[name] = Valu(std::get<int>(val) - std::get<int>(expn->eval(defs,ctxt)));
+>     } else if (std::holds_alternative<std::string>(val)) {
+>         throw std::logic_error("Cannot subtract strings");
+>     } else if (std::holds_alternative<bool>(val)) {
+>         ctxt[name] = Valu(std::get<bool>(val) - std::get<bool>(expn->eval(defs,ctxt)));
+156d156
+<     defn->call(defs,params,ctxt);
+159,163d158
+<     
+< std::optional<Valu> PRtn::exec([[maybe_unused]] const Defs& defs,
+<                                [[maybe_unused]] Ctxt& ctxt) const {
+<     return std::optional<Valu> { Valu { None } };
+< }
+165,166c160,162
+< std::optional<Valu> FRtn::exec(const Defs& defs, Ctxt& ctxt) const {
+<     return std::optional<Valu> { expn->eval(defs, ctxt) };
+---
+> 
+> std::optional<Valu> Ifcd::exec([[maybe_unused]]const Defs& defs, [[maybe_unused]]Ctxt& ctxt) const {
+>     return std::nullopt;
+169,173c165,169
+< std::optional<Valu> IfEl::exec(const Defs& defs, Ctxt& ctxt) const {
+<     Valu cond = cndn->eval(defs,ctxt);
+<     if (!std::holds_alternative<bool>(cond)) {
+<         std::string msg = "Run-time error: condition not a boolean.";
+<         throw DwislpyError { where(), msg };
+---
+> std::optional<Valu> Cond::exec(const Defs& defs, Ctxt& ctxt) const {
+>     for (auto ifcd : ifcds) {
+>         if (std::get<bool>(ifcd->cond->eval(defs,ctxt))) {
+>             return ifcd->body->exec(defs,ctxt);
+>         }
+175,176c171,172
+<     if (std::get<bool>(cond)) {
+<         return then_blck->exec(defs,ctxt);
+---
+>     if (els) {
+>         return els -> exec(defs, ctxt);
+178c174
+<         return else_blck->exec(defs,ctxt);
+---
+>         return std::nullopt;
+181,189c177,188
+<  
+< std::optional<Valu> Whle::exec(const Defs& defs, Ctxt& ctxt) const {
+<     Valu cond = cndn->eval(defs,ctxt);
+<     while (std::holds_alternative<bool>(cond) && std::get<bool>(cond)) {
+<         std::optional<Valu> maybe_return = blck->exec(defs,ctxt);
+<         if (maybe_return.has_value()) {
+<             return maybe_return;
+<         }
+<         cond = cndn->eval(defs,ctxt);
+---
+> 
+> 
+> std::optional<Valu> Else::exec(const Defs& defs, Ctxt& ctxt) const {
+>     return body->exec(defs,ctxt);
+> }
+> 
+> 
+> std::optional<Valu> Elif::exec(const Defs& defs, Ctxt& ctxt) const {
+>     if (std::get<bool>(cond->eval(defs,ctxt))) {
+>         return cond->eval(defs,ctxt);
+>     } else {
+>         return body->exec(defs,ctxt);
+191,193c190,195
+<     if (!std::holds_alternative<bool>(cond)) {
+<         std::string msg = "Run-time error: condition not a boolean.";
+<         throw DwislpyError { where(), msg };
+---
+> }
+> 
+> 
+> std::optional<Valu> Whil::exec(const Defs& defs, Ctxt& ctxt) const {
+>     while (std::get<bool>(cond->eval(defs,ctxt))) {
+>         body->exec(defs,ctxt);
+197a200,214
+> 
+> std::optional<Valu> Rept::exec(const Defs &defs, Ctxt &ctxt) const {
+>     do {
+>         body->exec(defs,ctxt);
+>     } while (std::get<bool>(cond->eval(defs,ctxt)));
+>     return std::nullopt;
+> }
+> 
+> 
+> std::optional<Valu> Rtrn::exec(const Defs& defs, Ctxt& ctxt) const {
+>     return expn->eval(defs,ctxt);
+> }
+> 
+> 
+> 
+204a222,297
+> Valu Defn::exec(const Defs& defs, const Ctxt& ctxt, const Args_vec& vec) const {
+>     Ctxt new_ctxt { ctxt };
+>     if (args.size() != vec.size()) {
+>         throw std::logic_error("Wrong number of arguments");
+>     }
+> 
+>     for (size_t i = 0; i < args.size(); i++) {
+>         new_ctxt[args[i]] = vec[i]->eval(defs, ctxt);
+>     }
+>     // handle return later 
+>     return body->exec(defs,new_ctxt).value_or(None);
+> }
+> 
+> 
+> Valu Call::eval(const Defs& defs, const Ctxt& ctxt) const {
+>     auto fn_iter = std::find_if(defs.begin(), defs.end(), [&](Defn_ptr fn) {return fn->name == name;});
+>     if (fn_iter == defs.end()) {
+>         throw std::logic_error("Function not found");
+>     }
+>     const Defn_ptr& fn = *fn_iter;
+>     return fn->exec(defs, ctxt, args);
+> }
+> 
+> Valu Inif::eval(const Defs& defs, const Ctxt& ctxt) const {
+>     if (std::get<bool>(cond->eval(defs, ctxt))) {
+>         return if_br->eval(defs, ctxt); 
+>     } else {
+>         return else_br->eval(defs, ctxt);
+>     }
+> }
+> 
+> Valu Negt::eval(const Defs& defs, const Ctxt& ctxt) const {
+>     return Valu(!std::get<bool>(expn->eval(defs,ctxt)));
+> }
+> 
+> Valu Imus::eval(const Defs& defs, const Ctxt& ctxt) const {
+>     return Valu(-std::get<int>(expn->eval(defs, ctxt)));
+> }
+> 
+> 
+> Valu Conj::eval(const Defs& defs, const Ctxt& ctxt) const {
+>     return Valu(std::get<bool>(lft->eval(defs,ctxt)) && std::get<bool>(rht->eval(defs,ctxt)));
+> };
+> 
+> 
+> Valu Disj::eval(const Defs& defs, const Ctxt& ctxt) const {
+>     return Valu(std::get<bool>(lft->eval(defs,ctxt)) || std::get<bool>(rht->eval(defs,ctxt)));
+> };
+> 
+> 
+> Valu Cmlt::eval(const Defs& defs, const Ctxt& ctxt) const {
+>     return Valu(std::get<int>(lft->eval(defs,ctxt)) < std::get<int>(rht->eval(defs,ctxt)));
+> };
+> 
+> 
+> Valu Cmgt::eval(const Defs& defs, const Ctxt& ctxt) const {
+>     return Valu(std::get<int>(lft->eval(defs,ctxt)) > std::get<int>(rht->eval(defs,ctxt)));
+> };
+> 
+> 
+> Valu Cmeq::eval(const Defs& defs, const Ctxt& ctxt) const {
+>     return Valu(std::get<int>(lft->eval(defs,ctxt)) == std::get<int>(rht->eval(defs,ctxt)));
+> };
+> 
+> 
+> Valu Cmle::eval(const Defs& defs, const Ctxt& ctxt) const {
+>     return Valu(std::get<int>(lft->eval(defs,ctxt)) <= std::get<int>(rht->eval(defs,ctxt)));
+> };
+> 
+> 
+> Valu Cmge::eval(const Defs& defs, const Ctxt& ctxt) const {
+>     return Valu(std::get<int>(lft->eval(defs,ctxt)) >= std::get<int>(rht->eval(defs,ctxt)));
+> };
+> 
+> 
+> 
+288,403d380
+< 
+< Valu Less::eval(const Defs& defs, const Ctxt& ctxt) const {
+<     Valu lv = left->eval(defs,ctxt);
+<     Valu rv = rght->eval(defs,ctxt);
+<     if (std::holds_alternative<int>(lv)
+<         && std::holds_alternative<int>(rv)) {
+<         int ln = std::get<int>(lv);
+<         int rn = std::get<int>(rv);
+<         return Valu {ln < rn};
+<     } else if (std::holds_alternative<std::string>(lv)
+<                && std::holds_alternative<std::string>(rv)) {
+<         std::string ls = std::get<std::string>(lv);
+<         std::string rs = std::get<std::string>(rv);
+<         return Valu {ls < rs};
+<     } else if (std::holds_alternative<bool>(lv)
+<                && std::holds_alternative<bool>(rv)) {
+<         bool lb = std::get<bool>(lv);
+<         bool rb = std::get<bool>(rv);
+<         return Valu {!lb && rb};
+<     } else {
+<         std::string msg = "Run-time error: wrong operand type for comparison.";
+<         throw DwislpyError { where(), msg };
+<     }        
+< }
+< 
+< Valu Equl::eval(const Defs& defs, const Ctxt& ctxt) const {
+<     Valu lv = left->eval(defs,ctxt);
+<     Valu rv = rght->eval(defs,ctxt);
+<     if (std::holds_alternative<int>(lv)
+<         && std::holds_alternative<int>(rv)) {
+<         int ln = std::get<int>(lv);
+<         int rn = std::get<int>(rv);
+<         return Valu {ln == rn};
+<     } else if (std::holds_alternative<std::string>(lv)
+<                && std::holds_alternative<std::string>(rv)) {
+<         std::string ls = std::get<std::string>(lv);
+<         std::string rs = std::get<std::string>(rv);
+<         return Valu {ls == rs};
+<     } else if (std::holds_alternative<bool>(lv)
+<                && std::holds_alternative<bool>(rv)) {
+<         bool lb = std::get<bool>(lv);
+<         bool rb = std::get<bool>(rv);
+<         return Valu {lb == rb};
+<     } else if (std::holds_alternative<none>(lv)
+<                && std::holds_alternative<none>(rv)) {
+<         return Valu {true};
+<     } else {
+<         return Valu {false};
+<     }        
+< }
+< 
+< Valu LsEq::eval(const Defs& defs, const Ctxt& ctxt) const {
+<     Valu lv = left->eval(defs,ctxt);
+<     Valu rv = rght->eval(defs,ctxt);
+<     if (std::holds_alternative<int>(lv)
+<         && std::holds_alternative<int>(rv)) {
+<         int ln = std::get<int>(lv);
+<         int rn = std::get<int>(rv);
+<         return Valu {ln <= rn};
+<     } else if (std::holds_alternative<std::string>(lv)
+<                && std::holds_alternative<std::string>(rv)) {
+<         std::string ls = std::get<std::string>(lv);
+<         std::string rs = std::get<std::string>(rv);
+<         return Valu {ls <= rs};
+<     } else if (std::holds_alternative<bool>(lv)
+<                && std::holds_alternative<bool>(rv)) {
+<         bool lb = std::get<bool>(lv);
+<         bool rb = std::get<bool>(rv);
+<         return Valu {!lb || rb};
+<     } else {
+<         std::string msg = "Run-time error: wrong operand type for comparison.";
+<         throw DwislpyError { where(), msg };
+<     }        
+< }
+< 
+< Valu And::eval(const Defs& defs, const Ctxt& ctxt) const {
+<     Valu lv = left->eval(defs,ctxt);
+<     if (std::holds_alternative<bool>(lv)) {
+<         bool lb = std::get<bool>(lv);
+<         if (lb) {
+<             return rght->eval(defs,ctxt);
+<         } else {
+<             return lv;
+<         }
+<     } else {
+<         std::string msg = "Run-time error: wrong operand type for conjunction.";
+<         throw DwislpyError { where(), msg };
+<     }        
+< }
+< 
+< Valu Or::eval(const Defs& defs, const Ctxt& ctxt) const {
+<     Valu lv = left->eval(defs,ctxt);
+<     if (std::holds_alternative<bool>(lv)) {
+<         bool lb = std::get<bool>(lv);
+<         if (lb) {
+<             return lv;
+<         } else {
+<             return rght->eval(defs,ctxt);
+<         }
+<     } else {
+<         std::string msg = "Run-time error: wrong operand type for disjunction.";
+<         throw DwislpyError { where(), msg };
+<     }        
+< }
+< 
+< Valu Not::eval(const Defs& defs, const Ctxt& ctxt) const {
+<     Valu ev = expn->eval(defs,ctxt);
+<     if (std::holds_alternative<bool>(ev)) {
+<         bool eb = std::get<bool>(ev);
+<         return Valu { !eb };
+<     } else {
+<         std::string msg = "Run-time error: wrong operand type for logical negation.";
+<         throw DwislpyError { where(), msg };
+<     }        
+< }
+< 
+436a414,417
+>     //
+>     // The integer conversion operation does nothing in this
+>     // version of DWISLPY.
+>     //
+468,488d448
+< Valu FCll::eval(const Defs& defs, const Ctxt& ctxt) const {
+<     if (defs.count(name) == 0) {
+<         std::string msg = "Run-time error: function '" + name +"'";
+<         msg += " is not defined.";
+<         throw DwislpyError { where(), msg };
+<     }
+<     Defn_ptr defn = defs.at(name);
+<     if (defn->arity() != params.size()) {
+<         std::string msg = "Run-time error: wrong number of arguments to ";
+<         msg += "function '" + name +"'.";
+<         throw DwislpyError { where(), msg };
+<     }
+<     std::optional<Valu> result = defn->call(defs,params,ctxt);
+<     if (!result.has_value()) {
+<         std::string msg = "Run-time error: no value returned from ";
+<         msg += "function '" + name +"'.";
+<         throw DwislpyError { where(), msg };
+<     }
+<     return result.value();
+< }
+< 
+500a461,593
+> void Pleq::output(std::ostream& os, std::string indent) const {
+>     os << indent << this->name << " += ";
+>     expn->output(os, indent);
+>     os << std::endl;
+> }
+> 
+> void Mneq::output(std::ostream& os, std::string indent) const {
+>     os << indent << this->name << " -= ";
+>     expn->output(os, indent);
+>     os << std::endl;
+> 
+> }
+> 
+> void Cond::output(std::ostream& os, std::string indent) const {
+>     this->ifcds[0]->output(os, indent);
+> 
+>     for (size_t index = 1; index < this->ifcds.size(); index++) {
+>         this->ifcds[index]->output(os, indent);
+>     }
+> 
+>     if (this->els) {
+>         this->els->output(os, indent);
+>     }
+> }
+> 
+> void Ifcd::output(std::ostream& os, std::string indent) const {
+>     os << indent << "if ";
+>     this->cond->output(os, indent);
+>     os << std::endl;
+>     this->body->output(os, indent + DEFAULT_INDENT_STR);
+>     os<<std::endl;
+> }
+> 
+> void Else::output(std::ostream& os, std::string indent) const {
+>     os << indent << "else" << std::endl;
+>     this->body->output(os, indent + DEFAULT_INDENT_STR);
+>     os<<std::endl;
+> }
+> 
+> void Elif::output(std::ostream& os, std::string indent) const {
+>     os << indent << "elif ";
+>     this->cond->output(os, indent);
+>     os << std::endl;
+>     this->body->output(os, indent + DEFAULT_INDENT_STR);
+>     os<<std::endl;
+> 
+> }
+> 
+> void Whil::output(std::ostream& os, std::string indent) const {
+>     os << indent << "while ";
+>     this->cond->output(os, indent);
+>     os << ": " << std::endl;
+>     this->body->output(os, indent + DEFAULT_INDENT_STR);
+>     os<<std::endl;
+> }
+> 
+> void Rept::output(std::ostream &os, std::string indent) const {
+>     os << indent << "repeat ";
+>     this->body->output(os, indent + DEFAULT_INDENT_STR);
+>     os << std::endl;
+>     this->cond->output(os, indent);
+>     os<<std::endl;
+> }
+> 
+> void Rtrn::output(std::ostream& os, std::string indent) const {
+>     os << indent << "return ";
+>     if (this->expn) {
+>         this->expn->output(os, indent);
+>     }
+>     os << std::endl;
+> }
+> 
+> void Inif::output(std::ostream &os) const {
+>     this->if_br->output(os); 
+>     os << " if ";
+>     this->cond->output(os);
+>     os << " else ";
+>     this->else_br->output(os);
+> }
+> 
+> void Negt::output(std::ostream& os) const {
+>     os << "not ";
+>     this->expn->output(os);
+> }
+> 
+> void Imus::output(std::ostream& os) const {
+>     os << "-";
+>     this->expn->output(os);
+> }
+> 
+> void Conj::output(std::ostream& os) const {
+>     this->lft->output(os);
+>     os << " and ";
+>     this->rht->output(os);
+> }
+>     
+> void Disj::output(std::ostream& os) const {
+>     this->lft->output(os);
+>     os << " or ";
+>     this->rht->output(os);
+> }
+>     
+> void Cmlt::output(std::ostream& os) const {
+>     this->lft->output(os);
+>     os << " < ";
+>     this->rht->output(os);
+> }
+>     
+> void Cmgt::output(std::ostream& os) const {
+>     this->lft->output(os);
+>     os << " < ";
+>     this->rht->output(os);
+> }
+>     
+> void Cmeq::output(std::ostream& os) const {
+>     this->lft->output(os);
+>     os << " == ";
+>     this->rht->output(os);
+> }
+>     
+> void Cmle::output(std::ostream& os) const {
+>     this->lft->output(os);
+>     os << " <= ";
+>     this->rht->output(os);
+> }
+>     
+> void Cmge::output(std::ostream& os) const {
+>     this->lft->output(os);
+>     os << " >= ";
+>     this->rht->output(os);
+> }
+>     
+> 
+502,503c595,596
+<     for (std::pair<Name,Defn_ptr> dfpr : defs) {
+<         dfpr.second->output(os);
+---
+>     for (Defn_ptr defn : defs) {
+>         defn->output(os);
+509,513c602,609
+<     os << "def " << name << "(";
+<     bool comma = false;
+<     for (unsigned int i=0; i < arity(); i++) {
+<         if (comma) {
+<             os << ",";
+---
+>     this->output(os, "");
+> }
+> 
+> void dump_args(const Args& args, std::ostream& os) {
+>     if (args.size()) {
+>         os << args[0];
+>         for (size_t index = 1; index < args.size(); index++) {
+>             os << ", " << args[index];
+515,516d610
+<         SymInfo_ptr frml = formal(i);
+<         os << frml->name << ":" << type_name(frml->type);
+518,519d611
+<     os << "):" << std::endl;
+<     body->output(os,"    ");
+521a614,621
+> void dump_args(const Args_vec& args, int level) {
+>     if (args.size()) {
+>         args[0]->dump(level);
+>         for (size_t index = 1; index < args.size(); index++) {
+>             args[index]->dump(level);
+>         }
+>     }
+> }
+522a623,646
+> void output_args(const Args_vec& args, std::ostream& os) {
+>     if (args.size()) {
+>         args[0]->output(os);
+>         for (size_t index = 1; index < args.size(); index++) {
+>             os << ", ";
+>             args[index]->output(os);
+>         }
+>     }
+> }
+> 
+> void Defn::output(std::ostream& os, std::string indent) const {
+>     // Your code goes here.
+>     os << "def " << name << "(";
+>     dump_args(args, os);
+>     os << "): " << std::endl; // BOGUS to shut up compiler warning.
+>     body->output(os, indent + DEFAULT_INDENT_STR);
+> }
+> 
+> void Call::output(std::ostream& os) const {
+>     os << name << "(";
+>     output_args(args, os);
+>     os << ")";
+> }
+> 
+531c655
+<         s->output(os);
+---
+>         s->output(os, "");
+542c666
+<     expn->output(os);
+---
+>     expn->output(os, indent);
+546,552d669
+< void Ntro::output(std::ostream& os, std::string indent) const {
+<     os << indent;
+<     os << name << " : " << type_name(type) << " = ";
+<     expn->output(os);
+<     os << std::endl;
+< }
+< 
+561,609c678,679
+<     expn->output(os);
+<     os << ")";
+<     os << std::endl;
+< }
+< 
+< void Whle::output(std::ostream& os, std::string indent) const {
+<     os << indent;
+<     os << "while ";
+<     cndn->output(os);
+<     os << ":";
+<     os << std::endl;
+<     blck->output(os,indent + "    ");
+< }
+< 
+< void IfEl::output(std::ostream& os, std::string indent) const {
+<     os << indent;
+<     os << "if ";
+<     cndn->output(os);
+<     os << ":";
+<     os << std::endl;
+<     then_blck->output(os,indent + "    ");
+<     os << "else:";
+<     os << std::endl;
+<     else_blck->output(os,indent + "    ");
+< }
+< 
+< void PRtn::output(std::ostream& os, std::string indent) const {
+<     os << indent;
+<     os << "return";
+<     os << std::endl;
+< }
+< 
+< void FRtn::output(std::ostream& os, std::string indent) const {
+<     os << indent;
+<     os << "return ";
+<     expn->output(os);
+<     os << std::endl;
+< }
+< 
+< void PCll::output(std::ostream& os, std::string indent) const {
+<     os << indent;
+<     os << name << "(";
+<     bool comma = false;
+<     for (Expn_ptr expn : params) {
+<         if (comma) {
+<             os << ",";
+<         }
+<         expn->output(os);
+<         comma = true;
+---
+>     if (expns.size()) {
+>         expns[0]->output(os, indent);
+610a681,682
+>     for (size_t i = 1; i < expns.size(); i++)
+>         expns[i]->output(os, indent);
+615d686
+< 
+656,701d726
+< void Less::output(std::ostream& os) const {
+<     os << "(";
+<     left->output(os);
+<     os << " < ";
+<     rght->output(os);
+<     os << ")";
+< }
+< 
+< void LsEq::output(std::ostream& os) const {
+<     os << "(";
+<     left->output(os);
+<     os << " <= ";
+<     rght->output(os);
+<     os << ")";
+< }
+< 
+< void Equl::output(std::ostream& os) const {
+<     os << "(";
+<     left->output(os);
+<     os << " == ";
+<     rght->output(os);
+<     os << ")";
+< }
+< 
+< void And::output(std::ostream& os) const {
+<     os << "(";
+<     left->output(os);
+<     os << " and ";
+<     rght->output(os);
+<     os << ")";
+< }
+< 
+< void Or::output(std::ostream& os) const {
+<     os << "(";
+<     left->output(os);
+<     os << " or ";
+<     rght->output(os);
+<     os << ")";
+< }
+< 
+< void Not::output(std::ostream& os) const {
+<     os << "(not ";
+<     expn->output(os);
+<     os << ")";
+< }
+< 
+728,739d752
+< void FCll::output(std::ostream& os) const {
+<     os << name << "(";
+<     bool comma = false;
+<     for (Expn_ptr expn : params) {
+<         if (comma) {
+<             os << ",";
+<         }
+<         expn->output(os);
+<         comma = true;
+<     }
+<     os << ")";
+< }
+741d753
+< 
+758a771,901
+> 
+> void Pleq::dump(int level) const {
+>     dump_indent(level);
+>     std::cout << "Pleq" << std::endl;
+>     dump_indent(level + 1);
+>     std::cout << name << std::endl;
+>     expn->dump(level+1);
+> };
+> 
+> void Mneq::dump(int level) const {
+>     dump_indent(level);
+>     std::cout << "Pleq" << std::endl;
+>     dump_indent(level + 1);
+>     std::cout << name << std::endl;
+>     expn->dump(level+1);
+> };
+> 
+> void Cond::dump(int level) const {
+>     for (auto ifcd : ifcds) {
+>         ifcd->dump(level+1);
+>     }
+>     if (els) {
+>         els->dump(level+1);
+>     }
+> };
+> 
+> void Ifcd::dump(int level) const {
+>     dump_indent(level);
+>     std::cout << "If" << std::endl;
+>     cond->dump(level+1);
+>     body->dump(level+1);
+> };
+> 
+> void Else::dump(int level) const {
+>     dump_indent(level);
+>     std::cout << "Else" << std::endl;
+>     body->dump(level+1);
+> };
+> 
+> 
+> void Elif::dump(int level) const {
+>     dump_indent(level);
+>     std::cout << "Elif" << std::endl;
+>     cond->dump(level+1);
+>     body->dump(level+1);
+> };
+> 
+> 
+> void Whil::dump(int level) const {
+>     dump_indent(level);
+>     std::cout << "While" << std::endl;
+>     cond->dump(level+1);
+>     body->dump(level+1);
+> };
+> 
+> void Rept::dump(int level) const {
+>     dump_indent(level);
+>     std::cout << "Repeat" << std::endl;
+>     body->dump(level+1);
+>     std::cout << "Until" << std::endl;
+>     cond->dump(level+1);
+> };
+> 
+> 
+> void Rtrn::dump(int level) const {
+>     dump_indent(level);
+>     std::cout << "Return" << std::endl;
+>     expn->dump(level+1);
+> };
+> 
+> void Inif::dump(int level) const {
+>     std::cout << "Inif" << std::endl;
+>     if_br->dump(level+1);
+>     cond->dump(level+1);
+>     else_br->dump(level+1);
+> }
+> 
+> void Negt::dump(int level) const {
+>     std::cout << "not ";
+>     expn->dump(level+1);
+> }
+> 
+> void Imus::dump(int level) const {
+>     std::cout << "-";
+>     expn->dump(level+1);
+> }
+> 
+> void Conj::dump(int level) const {
+>     lft->dump(level+1);
+>     std::cout << " and ";
+>     rht->dump(level+1);
+> }
+> 
+> void Disj::dump(int level) const {
+>     lft->dump(level+1);
+>     std::cout << " or ";
+>     rht->dump(level+1);
+> }
+> 
+> void Cmlt::dump(int level) const {
+>     lft->dump(level+1);
+>     std::cout << " < ";
+>     rht->dump(level+1);
+> }
+> 
+> void Cmgt::dump(int level) const {
+>     lft->dump(level+1);
+>     std::cout << " > ";
+>     rht->dump(level+1);
+> }
+> 
+> void Cmeq::dump(int level) const {
+>     lft->dump(level+1);
+>     std::cout << " == ";
+>     rht->dump(level+1);
+> }
+> 
+> void Cmle::dump(int level) const {
+>     lft->dump(level+1);
+>     std::cout << " <= ";
+>     rht->dump(level+1);
+> }
+> 
+> void Cmge::dump(int level) const {
+>     lft->dump(level+1);
+>     std::cout << " >= ";
+>     rht->dump(level+1);
+> }
+> 
+> 
+> 
+762,763c905,906
+<     for (std::pair<Name,Defn_ptr> dfpr : defs) {
+<         dfpr.second->dump(level+1);
+---
+>     for (Defn_ptr defn : defs) {
+>         defn->dump(level+1);
+765c908,911
+<     main->dump(level+1);
+---
+> 
+>     if (main) {
+>         main->dump(level+1);
+>     }
+770a917
+>     // Your code goes here.
+771a919,920
+>     std::cout << "Args" << std::endl;
+>     dump_indent(level + 2);
+773,777c922,924
+<     for (unsigned int i=0; i < arity(); i++) {
+<         dump_indent(level+1);
+<         SymInfo_ptr frml = formal(i);
+<         std::cout << frml->name << ":" << type_name(frml->type) << std::endl;
+<     }
+---
+>     dump_indent(level + 1);
+>     dump_args(args, std::cout);
+>     std::cout << std::endl;
+780a928,936
+> void Call::dump(int level) const {
+>     dump_indent(level);
+>     std::cout << "CALL" << std::endl;
+>     dump_indent(level+1);
+>     std::cout << name << std::endl;
+>     dump_args(args, level + 1);
+>     std::cout << std::endl;
+> }
+> 
+789,798d944
+< void Ntro::dump(int level) const {
+<     dump_indent(level);
+<     std::cout << "NTRO" << std::endl;
+<     dump_indent(level+1);
+<     std::cout << name << std::endl;
+<     dump_indent(level+1);
+<     std::cout << type_name(type) << std::endl;
+<     expn->dump(level+1);
+< }
+< 
+810,830c956,957
+<     expn->dump(level+1);
+< }
+< 
+< void PRtn::dump(int level) const {
+<     dump_indent(level);
+<     std::cout << "PRTN" << std::endl;
+< }
+< 
+< void FRtn::dump(int level) const {
+<     dump_indent(level);
+<     std::cout << "FRTN" << std::endl;
+<     expn->dump(level+1);
+< }
+< 
+< void PCll::dump(int level) const {
+<     dump_indent(level);
+<     std::cout << "PCLL" << std::endl;
+<     dump_indent(level+1);
+<     std::cout << name << std::endl;
+<     for (Expn_ptr expn : params) {
+<          expn->dump(level+1);
+---
+>     for (auto expn : expns) {
+>         expn->dump(level+1);
+839,853d965
+< void IfEl::dump(int level) const {
+<     dump_indent(level);
+<     std::cout << "IFEL" << std::endl;
+<     cndn->dump(level+1);
+<     then_blck->dump(level+1);
+<     else_blck->dump(level+1);
+< }
+< 
+< void Whle::dump(int level) const {
+<     dump_indent(level);
+<     std::cout << "WHLE" << std::endl;
+<     cndn->dump(level+1);
+<     blck->dump(level+1);
+< }
+< 
+889,929d1000
+< void Equl::dump(int level) const {
+<     dump_indent(level);
+<     std::cout << "EQUL" << std::endl;
+<     left->dump(level+1);
+<     rght->dump(level+1);
+< }
+< 
+< void LsEq::dump(int level) const {
+<     dump_indent(level);
+<     std::cout << "LSEQ" << std::endl;
+<     left->dump(level+1);
+<     rght->dump(level+1);
+< }
+< 
+< void Less::dump(int level) const {
+<     dump_indent(level);
+<     std::cout << "Less" << std::endl;
+<     left->dump(level+1);
+<     rght->dump(level+1);
+< }
+< 
+< void And::dump(int level) const {
+<     dump_indent(level);
+<     std::cout << "AND " << std::endl;
+<     left->dump(level+1);
+<     rght->dump(level+1);
+< }
+< 
+< void Or::dump(int level) const {
+<     dump_indent(level);
+<     std::cout << "OR  " << std::endl;
+<     left->dump(level+1);
+<     rght->dump(level+1);
+< }
+< 
+< void Not::dump(int level) const {
+<     dump_indent(level);
+<     std::cout << "NOT " << std::endl;
+<     expn->dump(level+1);
+< }
+< 
+960,969d1030
+< }
+< 
+< void FCll::dump(int level) const {
+<     dump_indent(level);
+<     std::cout << "FCLL" << std::endl;
+<     dump_indent(level+1);
+<     std::cout << name << std::endl;
+<     for (Expn_ptr expn : params) {
+<          expn->dump(level+1);
+<     }
+diff --color ./dwislpy-ast.hh ../dwislpy-v2/dwislpy-ast.hh
+34d33
+< #include <optional>
+36d34
+< #include "dwislpy-check.hh"
+44d41
+< typedef std::optional<Valu> RtnO;
+57d53
+< class Ntro;
+59,63d54
+< class PCll;
+< class PRtn;
+< class FRtn;
+< class IfEl;
+< class Whle;
+71,73d61
+< class And;
+< class Or;
+< class Not;
+82c70,93
+< class FCll;
+---
+> //
+> class Cond;
+> class Ifcd;
+> class Inif;
+> class Else;
+> class Elif;
+> class Whil;
+> class Rept;
+> class Coma;
+> class Coln;
+> class Rtrn;
+> class Pleq;
+> class Mneq;
+> class Negt;
+> class Conj;
+> class Disj;
+> class Cmlt;
+> class Cmgt;
+> class Cmeq;
+> class Cmle;
+> class Cmge;
+> class Call;
+> class Imus;
+> //
+83a95
+> 
+101,107c113,136
+< typedef std::shared_ptr<Less> Less_ptr;
+< typedef std::shared_ptr<LsEq> LsEq_ptr;
+< typedef std::shared_ptr<Equl> Equl_ptr;
+< typedef std::shared_ptr<And>  And_ptr;
+< typedef std::shared_ptr<Or>   Or_ptr;
+< typedef std::shared_ptr<Not>  Not_ptr;
+< typedef std::shared_ptr<FCll> FCll_ptr;
+---
+> 
+> 
+> typedef std::shared_ptr<Ifcd> Ifcd_ptr;
+> typedef std::shared_ptr<Inif> Inif_ptr;
+> typedef std::shared_ptr<Else> Else_ptr;
+> typedef std::shared_ptr<Elif> Elif_ptr;
+> typedef std::shared_ptr<Whil> Whil_ptr;
+> typedef std::shared_ptr<Rept> Rept_ptr;
+> typedef std::shared_ptr<Coma> Coma_ptr;
+> typedef std::shared_ptr<Coln> Coln_ptr;
+> typedef std::shared_ptr<Rtrn> Rtrn_ptr;
+> typedef std::shared_ptr<Pleq> Pleq_ptr;
+> typedef std::shared_ptr<Mneq> Mneq_ptr;
+> typedef std::shared_ptr<Negt> Negt_ptr;
+> typedef std::shared_ptr<Imus> Imus_ptr;
+> typedef std::shared_ptr<Conj> Conj_ptr;
+> typedef std::shared_ptr<Disj> Disj_ptr;
+> typedef std::shared_ptr<Cmlt> Cmlt_ptr;
+> typedef std::shared_ptr<Cmgt> Cmgt_ptr;
+> typedef std::shared_ptr<Cmeq> Cmeq_ptr;
+> typedef std::shared_ptr<Cmle> Cmle_ptr;
+> typedef std::shared_ptr<Cmge> Cmge_ptr;
+> typedef std::shared_ptr<Call> Call_ptr;
+> 
+111d139
+< typedef std::shared_ptr<Ntro> Ntro_ptr;
+113,117d140
+< typedef std::shared_ptr<PCll> PCll_ptr;
+< typedef std::shared_ptr<PRtn> PRtn_ptr;
+< typedef std::shared_ptr<FRtn> FRtn_ptr;
+< typedef std::shared_ptr<IfEl> IfEl_ptr;
+< typedef std::shared_ptr<Whle> Whle_ptr;
+123a147
+> typedef std::shared_ptr<Cond> Cond_ptr;
+128c152,157
+< typedef std::unordered_map<Name,Defn_ptr> Defs;
+---
+> typedef std::vector<Defn_ptr> Defs;
+> 
+> typedef std::vector<Name> Args;
+> typedef std::vector<Expn_ptr> Args_vec;
+> 
+> typedef std::vector<Ifcd_ptr> Ifcd_vec;
+180d208
+<     SymT main_symt;
+183c211
+<         AST {lo}, defs {ds}, main {mn}, main_symt{} { }
+---
+>         AST {lo}, defs {ds}, main {mn} { }
+186d213
+<     virtual void chck(void);                     // Verify the code.
+188c215
+<     virtual void run(void) const;                // Execute the program.
+---
+>     virtual void run(void) const; // Execute the program.
+202,203c229
+<     SymT symt;
+<     Type rety;
+---
+>     Args args;
+205,207c231
+<     //
+<     Defn(Name nm, SymT sy, Type rt, Blck_ptr bd, Locn lo) :
+<         AST {lo}, name {nm}, symt {sy}, rety {rt}, body {bd} { }
+---
+>     Defn(Name name, Args args, Blck_ptr body, Locn lo) :  AST {lo}, name {name}, args {args}, body {body}  { }
+210,216d233
+<     unsigned int arity(void) const;
+<     Type returns(void) const;
+<     SymInfo_ptr formal(int i) const;
+<     //
+<     virtual void chck(Defs& defs);
+<     std::optional<Valu> call(const Defs& defs,
+<                              const Expn_vec& args, const Ctxt& ctxt);
+218a236,237
+>     virtual void output(std::ostream& os, std::string indent) const; // Output formatted code.
+>     virtual Valu exec(const Defs& defs, const Ctxt& ctxt, const Args_vec& vec = {}) const;
+247d265
+<     virtual Rtns chck(Rtns expd, Defs& defs, SymT& symt) = 0;
+254c272
+< // Ntro - variable introduction with initializer
+---
+> // Asgn - assignment statement AST node
+256c274
+< class Ntro : public Stmt {
+---
+> class Asgn : public Stmt {
+259d276
+<     Type type;
+261,264c278,279
+<     Ntro(Name x, Type t, Expn_ptr e, Locn l) :
+<         Stmt {l}, name {x}, type {t},expn {e} { }
+<     virtual ~Ntro(void) = default;
+<     virtual Rtns chck(Rtns expd, Defs& defs, SymT& symt);
+---
+>     Asgn(Name x, Expn_ptr e, Locn l) : Stmt {l}, name {x}, expn {e} { }
+>     virtual ~Asgn(void) = default;
+270,273c285
+< //
+< // Asgn - assignment statement AST node
+< //
+< class Asgn : public Stmt {
+---
+> class Pleq : public Stmt {
+277,279c289,290
+<     Asgn(Name x, Expn_ptr e, Locn l) : Stmt {l}, name {x}, expn {e} { }
+<     virtual ~Asgn(void) = default;
+<     virtual Rtns chck(Rtns expd, Defs& defs, SymT& symt);
+---
+>     Pleq(Name x, Expn_ptr e, Locn l) : Stmt {l}, name {x}, expn {e} { }
+>     virtual ~Pleq(void) = default;
+285,288c296
+< //
+< // Prnt - print statement AST node
+< //
+< class Prnt : public Stmt {
+---
+> class Mneq : public Stmt {
+289a298
+>     Name     name;
+291,293c300,301
+<     Prnt(Expn_ptr e, Locn l) : Stmt {l}, expn {e} { }
+<     virtual ~Prnt(void) = default;
+<     virtual Rtns chck(Rtns expd, Defs& defs, SymT& symt);
+---
+>     Mneq(Name x, Expn_ptr e, Locn l) : Stmt {l}, name {x}, expn {e} { }
+>     virtual ~Mneq(void) = default;
+298a307,316
+> class Cond : public Stmt {
+>     public: 
+>         Ifcd_vec ifcds;
+>         Else_ptr els;
+>     Cond(Ifcd_vec v, Else_ptr e, Locn l) : Stmt {l}, ifcds {v}, els {e} { }
+>     Cond(Ifcd_vec v, Locn l) : Stmt {l}, ifcds {v}, els {nullptr} {} 
+>     virtual ~Cond(void) = default;
+>     virtual std::optional<Valu> exec(const Defs& defs, Ctxt& ctxt) const;
+>     virtual void output(std::ostream& os, std::string indent) const;
+>     virtual void dump(int level = 0) const;
+300,303c318,320
+< //
+< // Pass - pass statement AST node
+< //
+< class Pass : public Stmt {
+---
+> };
+> 
+> class Ifcd : public Stmt {
+305,307c322,325
+<     Pass(Locn l) : Stmt {l} { }
+<     virtual ~Pass(void) = default;
+<     virtual Rtns chck(Rtns expd, Defs& defs, SymT& symt);
+---
+>     Expn_ptr cond;
+>     Blck_ptr body;
+>     Ifcd(Expn_ptr c, Blck_ptr b, Locn l) : Stmt {l}, cond {c}, body {b} { }
+>     virtual ~Ifcd(void) = default;
+313c331,332
+< class PCll : public Stmt {
+---
+> 
+> class Else : public Stmt {
+315,319c334,336
+<     Name     name;
+<     Expn_vec params;
+<     PCll(Name nm, Expn_vec ps, Locn l) : Stmt {l}, name {nm}, params {ps} { }
+<     virtual ~PCll(void) = default;
+<     virtual Rtns chck(Rtns expd, Defs& defs, SymT& symt);
+---
+>     Blck_ptr body;
+>     Else(Blck_ptr b, Locn l) : Stmt {l}, body {b} { }
+>     virtual ~Else(void) = default;
+325c342,343
+< class PRtn : public Stmt {
+---
+> 
+> class Elif : public Ifcd {
+327,329c345,346
+<     PRtn(Locn l) : Stmt {l} { }
+<     virtual ~PRtn(void) = default;
+<     virtual Rtns chck(Rtns expd, Defs& defs, SymT& symt);
+---
+>     Elif(Expn_ptr c, Blck_ptr b, Locn l) : Ifcd {c, b, l} { }
+>     virtual ~Elif(void) = default;
+335c352,353
+< class FRtn : public Stmt {
+---
+> 
+> class Whil : public Stmt {
+336a355,377
+>     Expn_ptr cond;
+>     Blck_ptr body;
+>     Whil(Expn_ptr c, Blck_ptr b, Locn l) : Stmt {l}, cond {c}, body {b} { }
+>     virtual ~Whil(void) = default;
+>     virtual std::optional<Valu> exec(const Defs& defs, Ctxt& ctxt) const;
+>     virtual void output(std::ostream& os, std::string indent) const;
+>     virtual void dump(int level = 0) const;
+> };
+> 
+> class Rept : public Stmt {
+>     public: 
+>         Expn_ptr cond;
+>         Blck_ptr body;
+>         Rept(Expn_ptr c, Blck_ptr b, Locn l) : Stmt {l}, cond {c}, body {b} { }
+>         virtual ~Rept(void) = default;
+>         virtual std::optional<Valu> exec(const Defs& defs, Ctxt& ctxt) const;
+>         virtual void output(std::ostream& os, std::string indent) const;
+>         virtual void dump(int level = 0) const;
+> };
+> 
+> 
+> class Rtrn : public Stmt {
+> public:
+338,340c379,381
+<     FRtn(Expn_ptr e, Locn l) : Stmt {l}, expn {e} { }
+<     virtual ~FRtn(void) = default;
+<     virtual Rtns chck(Rtns expd, Defs& defs, SymT& symt);
+---
+>     Rtrn(Expn_ptr e, Locn l) : Stmt {l}, expn {e} { }
+>     Rtrn(Locn l) : Stmt {l}, expn {nullptr} { }
+>     virtual ~Rtrn(void) = default;
+346c387,392
+< class IfEl : public Stmt {
+---
+> 
+> 
+> //
+> // Prnt - print statement AST node
+> //
+> class Prnt : public Stmt {
+348,354c394,396
+<     Expn_ptr cndn;
+<     Blck_ptr then_blck;
+<     Blck_ptr else_blck;
+<     IfEl(Expn_ptr cd, Blck_ptr tb, Blck_ptr eb, Locn l) :
+<         Stmt {l}, cndn {cd}, then_blck {tb}, else_blck {eb} { }
+<     virtual ~IfEl(void) = default;
+<     virtual Rtns chck(Rtns expd, Defs& defs, SymT& symt);
+---
+>     Expn_vec expns;
+>     Prnt(Expn_vec e, Locn l) : Stmt {l}, expns {e} { }
+>     virtual ~Prnt(void) = default;
+360c402,406
+< class Whle : public Stmt {
+---
+> 
+> //
+> // Pass - pass statement AST node
+> //
+> class Pass : public Stmt {
+362,366c408,409
+<     Expn_ptr cndn;
+<     Blck_ptr blck;
+<     Whle(Expn_ptr cd, Blck_ptr bd, Locn l) : Stmt {l}, cndn {cd}, blck {bd} { }
+<     virtual ~Whle(void) = default;
+<     virtual Rtns chck(Rtns expd, Defs& defs, SymT& symt);
+---
+>     Pass(Locn l) : Stmt {l} { }
+>     virtual ~Pass(void) = default;
+382d424
+<     virtual Rtns chck(Rtns expd, Defs& defs, SymT& symt);
+412c454
+< class Expn : public AST {
+---
+> class Expn : public Stmt {
+414c456,457
+<     Expn(Locn lo) : AST {lo} { }
+---
+>     bool is_statement = false;
+>     Expn(Locn lo) : Stmt {lo} { }
+416c459,466
+<     virtual Type chck(Defs& defs, SymT& symt) = 0;
+---
+>     std::optional<Valu> exec(const Defs& defs, Ctxt& ctxt) const final {
+>         auto val = this->eval(defs, ctxt);
+> 
+>         if (is_statement)
+>             return std::nullopt;
+>         else 
+>             return this->eval(defs, ctxt);
+>     };
+417a468,485
+>     virtual void output(std::ostream& os) const = 0;
+>     void output(std::ostream& os, std::string indent) const final {
+>         if (is_statement) {
+>             os << indent;
+>         }
+> 
+>         this->output(os);
+> 
+>         if (is_statement) {
+>             os << std::endl;
+>         }
+>     }
+>     void make_stmt() {
+>         this->is_statement = true;
+>     }
+>     void make_expn() {
+>         this->is_statement = false;
+>     }
+420,423c488,500
+< //
+< // Plus - addition binary operation's AST node
+< //
+< class Plus : public Expn {
+---
+> class Inif : public Expn {
+>     public: 
+>         Expn_ptr if_br;
+>         Expn_ptr cond;
+>         Expn_ptr else_br;
+>         Inif(Expn_ptr if_br, Expn_ptr cond, Expn_ptr else_br, Locn l) : Expn {l}, if_br {if_br}, cond {cond}, else_br {else_br} { }
+>         virtual ~Inif(void) = default;
+>         virtual Valu eval(const Defs& defs, const Ctxt& ctxt) const;
+>         virtual void output(std::ostream& os) const;
+>         virtual void dump(int level = 0) const;
+> };
+> 
+> class Negt : public Expn {
+425,430c502,504
+<     Expn_ptr left;
+<     Expn_ptr rght;
+<     Plus(Expn_ptr lf, Expn_ptr rg, Locn lo)
+<         : Expn {lo}, left {lf}, rght {rg} { }
+<     virtual ~Plus(void) = default;
+<     virtual Type chck(Defs& defs, SymT& symt);
+---
+>     Expn_ptr expn;
+>     Negt(Expn_ptr e, Locn l) : Expn {l}, expn {e} { }
+>     virtual ~Negt(void) = default;
+436,439c510
+< //
+< // Mnus - subtraction binary operation's AST node
+< //
+< class Mnus : public Expn {
+---
+> class Imus : public Expn {
+441,446c512,514
+<     Expn_ptr left;
+<     Expn_ptr rght;
+<     Mnus(Expn_ptr lf, Expn_ptr rg, Locn lo)
+<         : Expn {lo}, left {lf}, rght {rg} { }
+<     virtual ~Mnus(void) = default;
+<     virtual Type chck(Defs& defs, SymT& symt);
+---
+>     Expn_ptr expn;
+>     Imus(Expn_ptr e, Locn l) : Expn {l}, expn {e} { }
+>     virtual ~Imus(void) = default;
+452,455c520,521
+< //
+< // Tmes - multiplication binary operation's AST node
+< //
+< class Tmes : public Expn {
+---
+> 
+> class Conj : public Expn {
+457,462c523,526
+<     Expn_ptr left;
+<     Expn_ptr rght;
+<     Tmes(Expn_ptr lf, Expn_ptr rg, Locn lo)
+<         : Expn {lo}, left {lf}, rght {rg} { }
+<     virtual ~Tmes(void) = default;
+<     virtual Type chck(Defs& defs, SymT& symt);
+---
+>     Expn_ptr lft;
+>     Expn_ptr rht;
+>     Conj(Expn_ptr lft, Expn_ptr rht, Locn l) : Expn {l}, lft {lft}, rht {rht} { }
+>     virtual ~Conj(void) = default;
+468,471c532,533
+< //
+< // IDiv - quotient binary operation's AST node
+< //
+< class IDiv : public Expn {
+---
+> 
+> class Disj : public Expn {
+473,478c535,538
+<     Expn_ptr left;
+<     Expn_ptr rght;
+<     IDiv(Expn_ptr lf, Expn_ptr rg, Locn lo)
+<         : Expn {lo}, left {lf}, rght {rg} { }
+<     virtual ~IDiv(void) = default;
+<     virtual Type chck(Defs& defs, SymT& symt);
+---
+>     Expn_ptr lft;
+>     Expn_ptr rht;
+>     Disj(Expn_ptr lft, Expn_ptr rht, Locn l) : Expn {l}, lft {lft}, rht {rht} { }
+>     virtual ~Disj(void) = default;
+484,487c544,545
+< //
+< // IMod - remainder binary operation's AST node
+< //
+< class IMod : public Expn {
+---
+> 
+> class Cmlt : public Expn {
+489,494c547,550
+<     Expn_ptr left;
+<     Expn_ptr rght;
+<     IMod(Expn_ptr lf, Expn_ptr rg, Locn lo)
+<         : Expn {lo}, left {lf}, rght {rg} { }
+<     virtual ~IMod(void) = default;
+<     virtual Type chck(Defs& defs, SymT& symt);
+---
+>     Expn_ptr lft;
+>     Expn_ptr rht;
+>     Cmlt(Expn_ptr lft, Expn_ptr rht, Locn l) : Expn {l}, lft {lft}, rht {rht} { }
+>     virtual ~Cmlt(void) = default;
+500c556,557
+< class Less : public Expn {
+---
+> 
+> class Cmgt : public Expn {
+502,507c559,562
+<     Expn_ptr left;
+<     Expn_ptr rght;
+<     Less(Expn_ptr lf, Expn_ptr rg, Locn lo)
+<         : Expn {lo}, left {lf}, rght {rg} { }
+<     virtual ~Less(void) = default;
+<     virtual Type chck(Defs& defs, SymT& symt);
+---
+>     Expn_ptr lft;
+>     Expn_ptr rht;
+>     Cmgt(Expn_ptr lft, Expn_ptr rht, Locn l) : Expn {l}, lft {lft}, rht {rht} { }
+>     virtual ~Cmgt(void) = default;
+513c568,569
+< class LsEq : public Expn {
+---
+> 
+> class Cmeq : public Expn {
+514a571,620
+>     Expn_ptr lft;
+>     Expn_ptr rht;
+>     Cmeq(Expn_ptr lft, Expn_ptr rht, Locn l) : Expn {l}, lft {lft}, rht {rht} { }
+>     virtual ~Cmeq(void) = default;
+>     virtual Valu eval(const Defs& defs, const Ctxt& ctxt) const;
+>     virtual void output(std::ostream& os) const;
+>     virtual void dump(int level = 0) const;
+> };
+> 
+> 
+> class Cmle : public Expn {
+> public:
+>     Expn_ptr lft;
+>     Expn_ptr rht;
+>     Cmle(Expn_ptr lft, Expn_ptr rht, Locn l) : Expn {l}, lft {lft}, rht {rht} { }
+>     virtual ~Cmle(void) = default;
+>     virtual Valu eval(const Defs& defs, const Ctxt& ctxt) const;
+>     virtual void output(std::ostream& os) const;
+>     virtual void dump(int level = 0) const;
+> };
+> 
+> 
+> class Cmge : public Expn {
+> public:
+>     Expn_ptr lft;
+>     Expn_ptr rht;
+>     Cmge(Expn_ptr lft, Expn_ptr rht, Locn l) : Expn {l}, lft {lft}, rht {rht} { }
+>     virtual ~Cmge(void) = default;
+>     virtual Valu eval(const Defs& defs, const Ctxt& ctxt) const;
+>     virtual void output(std::ostream& os) const;
+>     virtual void dump(int level = 0) const;
+> };
+> 
+> 
+> class Call : public Expn {
+>     public: 
+>         std::string name;
+>         Expn_vec args;
+>         Call(std::string name, Expn_vec args, Locn l) : Expn {l}, name {name}, args {args} { }
+>         virtual ~Call(void) = default;
+>         virtual Valu eval(const Defs& defs, const Ctxt& ctxt) const;
+>         virtual void output(std::ostream& os) const;
+>         virtual void dump(int level = 0) const;
+> };
+> 
+> //
+> // Plus - addition binary operation's AST node
+> //
+> class Plus : public Expn {
+> public:
+517c623
+<     LsEq(Expn_ptr lf, Expn_ptr rg, Locn lo)
+---
+>     Plus(Expn_ptr lf, Expn_ptr rg, Locn lo)
+519,520c625
+<     virtual ~LsEq(void) = default;
+<     virtual Type chck(Defs& defs, SymT& symt);
+---
+>     virtual ~Plus(void) = default;
+526c631,634
+< class Equl : public Expn {
+---
+> //
+> // Mnus - subtraction binary operation's AST node
+> //
+> class Mnus : public Expn {
+530c638
+<     Equl(Expn_ptr lf, Expn_ptr rg, Locn lo)
+---
+>     Mnus(Expn_ptr lf, Expn_ptr rg, Locn lo)
+532,533c640
+<     virtual ~Equl(void) = default;
+<     virtual Type chck(Defs& defs, SymT& symt);
+---
+>     virtual ~Mnus(void) = default;
+539c646,649
+< class And : public Expn {
+---
+> //
+> // Tmes - multiplication binary operation's AST node
+> //
+> class Tmes : public Expn {
+543c653
+<     And(Expn_ptr lf, Expn_ptr rg, Locn lo)
+---
+>     Tmes(Expn_ptr lf, Expn_ptr rg, Locn lo)
+545,546c655
+<     virtual ~And(void) = default;
+<     virtual Type chck(Defs& defs, SymT& symt);
+---
+>     virtual ~Tmes(void) = default;
+552c661,664
+< class Or : public Expn {
+---
+> //
+> // IDiv - quotient binary operation's AST node
+> //
+> class IDiv : public Expn {
+556c668
+<     Or(Expn_ptr lf, Expn_ptr rg, Locn lo)
+---
+>     IDiv(Expn_ptr lf, Expn_ptr rg, Locn lo)
+558,559c670
+<     virtual ~Or(void) = default;
+<     virtual Type chck(Defs& defs, SymT& symt);
+---
+>     virtual ~IDiv(void) = default;
+565c676,679
+< class Not : public Expn {
+---
+> //
+> // IMod - remainder binary operation's AST node
+> //
+> class IMod : public Expn {
+567,571c681,685
+<     Expn_ptr expn;
+<     Not(Expn_ptr ex, Locn lo)
+<         : Expn {lo}, expn {ex} { }
+<     virtual ~Not(void) = default;
+<     virtual Type chck(Defs& defs, SymT& symt);
+---
+>     Expn_ptr left;
+>     Expn_ptr rght;
+>     IMod(Expn_ptr lf, Expn_ptr rg, Locn lo)
+>         : Expn {lo}, left {lf}, rght {rg} { }
+>     virtual ~IMod(void) = default;
+585d698
+<     virtual Type chck(Defs& defs, SymT& symt);
+600d712
+<     virtual Type chck(Defs& defs, SymT& symt);
+614d725
+<     virtual Type chck(Defs& defs, SymT& symt);
+628d738
+<     virtual Type chck(Defs& defs, SymT& symt);
+642,654d751
+<     virtual Type chck(Defs& defs, SymT& symt);
+<     virtual Valu eval(const Defs& defs, const Ctxt& ctxt) const;
+<     virtual void output(std::ostream& os) const;
+<     virtual void dump(int level = 0) const;
+< };
+< 
+< class FCll : public Expn {
+< public:
+<     Name     name;
+<     Expn_vec params;
+<     FCll(Name nm, Expn_vec ps, Locn l) : Expn {l}, name {nm}, params {ps} { }
+<     virtual ~FCll(void) = default;
+<     virtual Type chck(Defs& defs, SymT& symt);
+diff --color ./dwislpy-bison.yy ../dwislpy-v2/dwislpy-bison.yy
+12d11
+<     #include "dwislpy-check.hh"
+47a47,66
+> 
+> %token               DEFF "def"
+> %token               IFCD "if"
+> %token               ELSE "else"
+> %token               ELIF "elif"
+> %token               WHIL "while"
+> %token               COMA ","
+> %token               COLN ":"
+> %token               RTRN "return"
+> %token               PLEQ "+="
+> %token               MNEQ "-="
+> %token               NEGT "not"
+> %token               CONJ "and"
+> %token               DISJ "or"
+> %token               CMLT "<"
+> %token               CMGT ">"
+> %token               CMEQ "=="
+> %token               CMLE "<="
+> %token               CMGE ">="
+> 
+51d69
+< %token               BOOL "bool"
+54,62d71
+< %token               DEFN "def"
+< %token               RTRN "return"
+< %token               AND  "and"
+< %token               OR   "or"
+< %token               NOT  "not"
+< %token               IFTN "if"
+< %token               ELSE "else"
+< %token               WHLE "while"
+< %token               ARRW "->"
+69,71d77
+< %token               LSEQ "<="
+< %token               LESS "<"
+< %token               EQUL "=="
+74,75d79
+< %token               CMMA ","
+< %token               COLN ":"
+78a83,84
+> %token               REPT "repeat"
+> %token               UNTL "until"
+86,88d91
+< %type <SymT>     fmls
+< %type <Type>     type
+< %type <Expn_vec> exps
+90a94,95
+> %type <Args>     args
+> %type <Args_vec> expns
+93a99,100
+> %type <Ifcd_vec> elifb
+> %type <Else_ptr> elseb
+98a106,110
+> 
+> %left DISJ;
+> %left CONJ;
+> %precedence NEGT;
+> %left CMEQ CMLE CMGE CMLT CMGT;
+101c113
+<     
+---
+> 
+109,119c121,123
+<   blck {
+<       Defs ds { };
+<       Blck_ptr b = $1; 
+<       $$ = Prgm_ptr { new Prgm {ds, b, b->where()} };
+<   }   
+< | defs blck {
+<       Defs     ds = $1;
+<       Blck_ptr b  = $2; 
+<       $$ = Prgm_ptr { new Prgm {ds, b, b->where()} };
+<   }
+< ;
+---
+>   defs blck {
+>       Defs ds = $1; 
+>       Blck_ptr b = $2;
+121,125c125
+< defs: defn {
+<       Defs ds { };
+<       Defn_ptr d = $1;
+<       ds[d->name] = d;
+<       $$ = ds;
+---
+>       $$ = Prgm_ptr { new Prgm {ds, b, lexer.locate(@1)} };
+127,131c127,128
+< | defs defn {
+<       Defs ds = $1;
+<       Defn_ptr d = $2;
+<       ds[d->name] = d;
+<       $$ = ds;
+---
+> | defs {
+>       $$ = Prgm_ptr { new Prgm {$1, Blck_ptr{nullptr}, lexer.locate(@1)} };
+135,149c132,143
+< defn:
+<   DEFN NAME LPAR RPAR ARRW type COLN EOLN nest {
+<     SymT ps { };
+<     $$ = Defn_ptr { new Defn {$2, ps, $6, $9, lexer.locate(@1)} };
+<   }    
+< | DEFN NAME LPAR RPAR COLN EOLN nest {
+<     SymT ps { };
+<     $$ = Defn_ptr { new Defn {$2, ps, NoneTy {}, $7, lexer.locate(@1)} };
+<   }    
+< | DEFN NAME LPAR fmls RPAR ARRW type COLN EOLN nest {
+<     $$ = Defn_ptr { new Defn {$2, $4, $7, $10, lexer.locate(@1)} };
+<   }
+< | DEFN NAME LPAR fmls RPAR COLN EOLN nest {
+<     $$ = Defn_ptr { new Defn {$2, $4, NoneTy {}, $8, lexer.locate(@1)} };
+<   }
+---
+> defs:
+>     defs defn {
+>         Defs ds = $1;
+>         ds.push_back($2);
+>         $$ = ds;
+>     }
+> |   defn {
+>         $$ = Defs {$1};
+>     }
+> |   {
+>         $$ = Defs {};
+>     }
+152,162c146,158
+< fmls:
+<   NAME COLN type {
+<     SymT ps { };
+<     ps.add_frml($1,$3);
+<     $$ = ps;
+<   }
+< | fmls CMMA NAME COLN type {
+<     SymT ps = $1;
+<     ps.add_frml($3,$5);
+<     $$ = ps;
+<   }
+---
+> args:
+>     args COMA NAME {
+>         Args as = $1;
+>         as.push_back($3);
+>         $$ = as;
+>     }
+> |   NAME {
+>         $$ = Args {$1};
+>     }
+> |   {
+>         Args as {};
+>         $$ = as;
+>     }
+165,177c161,164
+< type:
+<   INTC {
+<     $$ = IntTy {};
+<   }
+< | STRC {
+<     $$ = StrTy {};
+<   }
+< | BOOL {
+<     $$ = BoolTy {};
+<   }
+< | NONE {
+<     $$ = NoneTy {};
+<   }
+---
+> defn: 
+>     DEFF NAME LPAR args RPAR COLN EOLN nest {
+>         $$ = Defn_ptr { new Defn { $2, $4, $8, $8->where() } };
+>     }
+179,183c166,173
+<         
+< nest:
+<   INDT blck DEDT {
+<     $$ = $2;
+<   }
+---
+> 
+> nest: 
+>     INDT blck DEDT {
+>         $$ = $2;
+>     }
+> |   INDT blck EOFL {
+>         $$ = $2; 
+>     }
+207,208c197,199
+<   NAME COLN type ASGN expn EOLN {
+<       $$ = Ntro_ptr { new Ntro {$1,$3,$5,lexer.locate(@2)} };
+---
+>   expn EOLN{
+>     $1->make_stmt();
+>     $$ = $1;
+209a201,205
+> 
+> | REPT COLN EOLN nest UNTL expn EOLN {
+>     $$ = Rept_ptr { new Rept { $6, $4, lexer.locate(@1) } };
+>   }
+> 
+213,214c209,211
+< | PASS EOLN {
+<       $$ = Pass_ptr { new Pass {lexer.locate(@1)} };
+---
+> 
+> | NAME PLEQ expn EOLN {
+>       $$ = Pleq_ptr { new Pleq {$1, $3, lexer.locate(@2)} };
+216,217c213,215
+< | PRNT LPAR expn RPAR EOLN {
+<       $$ = Prnt_ptr { new Prnt {$3,lexer.locate(@1)} };
+---
+> 
+> | NAME MNEQ expn EOLN {
+>       $$ = Mneq_ptr { new Mneq {$1, $3, lexer.locate(@2)} };
+219,220c217,220
+< | NAME LPAR exps RPAR EOLN {
+<       $$ = PCll_ptr { new PCll {$1,$3,lexer.locate(@1)} };
+---
+> 
+> | IFCD expn COLN EOLN nest elifb elseb {
+>       $6.push_back(Ifcd_ptr {new Ifcd {$2, $5, $2->where()}});
+>       $$ = Cond_ptr { new Cond {$6, $7, lexer.locate(@1)} };
+222,224c222,224
+< | NAME LPAR RPAR EOLN {
+<       Expn_vec ps { };
+<       $$ = PCll_ptr { new PCll {$1,ps,lexer.locate(@1)} };
+---
+> 
+> | WHIL expn COLN EOLN nest {
+>       $$ = Whil_ptr { new Whil {$2, $5, lexer.locate(@1)} };
+225a226
+> 
+227c228
+<       $$ = FRtn_ptr { new FRtn {$2,lexer.locate(@1)} };
+---
+>       $$ = Rtrn_ptr { new Rtrn {$2, lexer.locate(@1)} };
+228a230
+> 
+230c232
+<       $$ = PRtn_ptr { new PRtn {lexer.locate(@1)} };
+---
+>       $$ = Rtrn_ptr { new Rtrn {lexer.locate(@1)} };
+232d233
+< ;
+234,238c235,236
+< exps:
+<   expn {
+<     Expn_vec ps { };
+<     ps.push_back($1);
+<     $$ = ps;
+---
+> | PASS EOLN {
+>       $$ = Pass_ptr { new Pass {lexer.locate(@1)} };
+240,243c238,239
+< | exps CMMA expn {
+<     Expn_vec ps = $1;
+<     ps.push_back($3);
+<     $$ = ps;
+---
+> | PRNT LPAR expns RPAR EOLN {
+>       $$ = Prnt_ptr { new Prnt {$3,lexer.locate(@1)} };
+246c242,274
+<     
+---
+> 
+> elifb: 
+>     elifb ELIF expn COLN EOLN nest {
+>         $1.push_back(Ifcd_ptr {new Ifcd {$3, $6, $3->where()}});
+>         $$ = $1;   
+>     }
+> |   {
+>         $$ = Ifcd_vec {};
+>     }
+> ;
+> 
+> elseb:
+>     ELSE COLN EOLN nest {
+>         $$ = Else_ptr { new Else {$4, $4->where()} };
+>     }
+> |   {
+>         $$ = Else_ptr { nullptr };
+>     }
+> ;
+> 
+> expns:
+>     expns COMA expn {
+>         $1.push_back($3);
+>         $$ = $1;
+>     }
+> |   expn {
+>         $$ = Expn_vec {$1};
+>     }
+> |   {
+>         $$ = Expn_vec {};
+>     }
+> ;
+> 
+248c276,284
+<   expn PLUS expn {
+---
+>   NAME LPAR expns RPAR {
+>     $$ = Call_ptr { new Call {$1, $3, lexer.locate(@1)} };
+>   }
+> 
+> | expn IFCD expn ELSE expn {
+>     $$ = Inif_ptr { new Inif {$1, $3, $5, $1->where()} };
+>   }
+> 
+> | expn PLUS expn {
+253a290,292
+> | MNUS expn {
+>       $$ = Imus_ptr { new Imus {$2, lexer.locate(@1)} };
+>   }
+262a302,326
+> | expn CMLT expn {
+>       $$ = Cmlt_ptr { new Cmlt {$1,$3,lexer.locate(@2)} };
+>   }
+> | expn CMGT expn {
+>       $$ = Cmgt_ptr { new Cmgt {$1,$3,lexer.locate(@2)} };
+>   }
+> | expn CMLE expn {
+>       $$ = Cmle_ptr { new Cmle {$1,$3,lexer.locate(@2)} };
+>   }
+> | expn CMGE expn {
+>     $$ = Cmge_ptr { new Cmge {$1,$3,lexer.locate(@2)} };
+>   }
+> | expn CMEQ expn {
+>     $$ = Cmeq_ptr { new Cmeq {$1,$3,lexer.locate(@2)} };
+>   }
+> | expn CONJ expn {
+>     $$ = Conj_ptr { new Conj {$1,$3,lexer.locate(@2)} };
+>   }
+> | expn DISJ expn {
+>     $$ = Disj_ptr { new Disj {$1,$3,lexer.locate(@2)} };
+>   }
+> | NEGT expn {
+>     $$ = Negt_ptr { new Negt {$2,lexer.locate(@1)} };
+>   }
+> 
+289,295d352
+<   }
+< | NAME LPAR RPAR {
+<       Expn_vec ps { };
+<       $$ = FCll_ptr { new FCll {$1,ps,lexer.locate(@1)} };
+<   }
+< | NAME LPAR exps RPAR {
+<       $$ = FCll_ptr { new FCll {$1,$3,lexer.locate(@1)} };
+Only in .: dwislpy-check.cc
+Only in .: dwislpy-check.hh
+diff --color ./dwislpy-flex.ll ../dwislpy-v2/dwislpy-flex.ll
+355a356,454
+> <MID_LINE>"def" {
+>     // Handle the `def` keyword.
+>     return issue(token::Token_DEFF, yytext ,loc);
+> }
+> 
+> <MID_LINE>"if" {
+>     // Handle the `def` keyword.
+>     return issue(token::Token_IFCD, yytext ,loc);
+> }
+> 
+> <MID_LINE>"else" {
+>     // Handle the `def` keyword.
+>     return issue(token::Token_ELSE, yytext ,loc);
+> }
+> 
+> <MID_LINE>"repeat" {
+>     return issue(token::Token_REPT, yytext ,loc);
+> }
+> 
+> <MID_LINE>"until" {
+>     return issue(token::Token_UNTL, yytext ,loc);
+> }
+> 
+> <MID_LINE>"elif" {
+>     // Handle the `def` keyword.
+>     return issue(token::Token_ELIF, yytext ,loc);
+> }
+> 
+> <MID_LINE>"while" {
+>     // Handle the `def` keyword.
+>     return issue(token::Token_WHIL, yytext ,loc);
+> }
+> 
+> <MID_LINE>"," {
+>     // Handle the `,` keyword.
+>     return issue(token::Token_COMA, yytext ,loc);
+> }
+> 
+> <MID_LINE>":" {
+>     // Handle the `:` keyword.
+>     return issue(token::Token_COLN, yytext ,loc);
+> }
+> 
+> <MID_LINE>"return" {
+>     // Handle the `return` keyword.
+>     return issue(token::Token_RTRN, yytext ,loc);
+> }
+> 
+> <MID_LINE>"+=" {
+>     // Handle the `+=` keyword.
+>     return issue(token::Token_PLEQ, yytext ,loc);
+> }
+> 
+> <MID_LINE>"-=" {
+>     // Handle the `-=` keyword.
+>     return issue(token::Token_MNEQ, yytext ,loc);
+> }
+> 
+> <MID_LINE>"not" {
+>     // Handle the `not` keyword.
+>     return issue(token::Token_NEGT, yytext ,loc);
+> }
+> 
+> <MID_LINE>"and" {
+>     // Handle the `and` keyword.
+>     return issue(token::Token_CONJ, yytext ,loc);
+> }
+> 
+> <MID_LINE>"or" {
+>     // Handle the `or` keyword.
+>     return issue(token::Token_DISJ, yytext ,loc);
+> }
+> 
+> <MID_LINE>"==" {
+>     // Handle the `==` keyword.
+>     return issue(token::Token_CMEQ, yytext ,loc);
+> }
+> 
+> <MID_LINE>"<" {
+>     // Handle the `<` keyword.
+>     return issue(token::Token_CMLT, yytext ,loc);
+> }
+> 
+> <MID_LINE>">" {
+>     // Handle the `>` keyword.
+>     return issue(token::Token_CMGT, yytext ,loc);
+> }
+> 
+> <MID_LINE>"<=" {
+>     // Handle the `<=` keyword.
+>     return issue(token::Token_CMLE, yytext ,loc);
+> }
+> 
+> <MID_LINE>">=" {
+>     // Handle the `!=` keyword.
+>     return issue(token::Token_CMGE, yytext ,loc);
+> }
+> 
+> 
+380,387d478
+< <MID_LINE>":" {
+<     return issue(token::Token_COLN,yytext,loc);
+< }
+< 
+< <MID_LINE>"," {
+<     return issue(token::Token_CMMA,yytext,loc);
+< }
+< 
+400,443d490
+< <MID_LINE>return {
+<     return issue(token::Token_RTRN,yytext,loc);
+< }
+<     
+< <MID_LINE>def {
+<     return issue(token::Token_DEFN,yytext,loc);
+< }
+<     
+< <MID_LINE>and {
+<     return issue(token::Token_AND,yytext,loc);
+< }
+<     
+< <MID_LINE>or {
+<     return issue(token::Token_OR,yytext,loc);
+< }
+<     
+< <MID_LINE>not {
+<     return issue(token::Token_NOT,yytext,loc);
+< }
+<     
+< <MID_LINE>"==" {
+<     return issue(token::Token_EQUL,yytext,loc);
+< }
+<     
+< <MID_LINE>"<=" {
+<     return issue(token::Token_LSEQ,yytext,loc);
+< }
+<     
+< <MID_LINE>"<" {
+<     return issue(token::Token_LESS,yytext,loc);
+< }
+<     
+< <MID_LINE>while {
+<     return issue(token::Token_WHLE,yytext,loc);
+< }
+<     
+< <MID_LINE>if {
+<     return issue(token::Token_IFTN,yytext,loc);
+< }
+<     
+< <MID_LINE>else {
+<     return issue(token::Token_ELSE,yytext,loc);
+< }
+<     
+472,479d518
+< <MID_LINE>"->" {
+<     return issue(token::Token_ARRW,yytext,loc);
+< }
+<     
+< <MID_LINE>bool {
+<     return issue(token::Token_BOOL,yytext,loc);
+< }
+<     
+498c537,544
+<     return issue(token::Token_EOFL,"",loc);
+---
+>     std::cout << "size of indents " << indents.size();
+>     if (indents.size()) {
+>         yyless(0);
+>         indents.pop_back();
+>         return issue(token::Token_DEDT,"",loc);
+>     } else {
+>         return issue(token::Token_EOFL,"",loc);
+>     }
+diff --color ./dwislpy-main.cc ../dwislpy-v2/dwislpy-main.cc
+101c101
+<     program->run();
+---
+>     main->run();
+106,113d105
+< // Runs the DwiSlpy program.
+< //
+< void DWISLPY::Driver::check(void) {
+<     program->chck();
+< }
+< 
+< // dump
+< //
+119c111
+<         program->output(std::cout);
+---
+>         main->output(std::cout);
+121c113
+<         program->dump();
+---
+>         main->dump();
+161d152
+<                 dwislpy.check();
+diff --color ./dwislpy-main.hh ../dwislpy-v2/dwislpy-main.hh
+59d58
+<         void check(void);
+61c60
+<         void set(Prgm_ptr prgm) { program = prgm; }
+---
+>         void set(Prgm_ptr prgm) { main = prgm; }
+65c64
+<         Prgm_ptr    program = nullptr;
+---
+>         Prgm_ptr    main = nullptr;
+diff --color ./dwislpy-util.hh ../dwislpy-v2/dwislpy-util.hh
+74d73
+< 
+Only in ../dwislpy-v2: minus_inplace.py
+Only in ../dwislpy-v2: mul_print.py
+Only in ../dwislpy-v2: only_statements.py
+Only in ../dwislpy-v2: precedences.py
+Only in ../dwislpy-v2: proper_end.py
+Only in ../dwislpy-v2: readme.md
+Only in ../dwislpy-v2: repeat_until.py
+Only in ../dwislpy-v2: shorthand.py
+Only in ../dwislpy-v2: stmt.py
+Only in ../dwislpy-v2: test_expn_if.py
+Only in ../dwislpy-v2: test_if.py
+Only in ../dwislpy-v2: test_if_if.py

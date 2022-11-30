@@ -353,6 +353,110 @@ WSPC    {INDT}
     return issue(token::Token_STRG,txt,loc);
 }
 
+<MID_LINE>"def" {
+    // Handle the `def` keyword.
+    return issue(token::Token_DEFF, yytext ,loc);
+}
+
+<MID_LINE>"if" {
+    // Handle the `def` keyword.
+    return issue(token::Token_IFCD, yytext ,loc);
+}
+
+<MID_LINE>"else" {
+    // Handle the `def` keyword.
+    return issue(token::Token_ELSE, yytext ,loc);
+}
+
+<MID_LINE>"repeat" {
+    return issue(token::Token_REPT, yytext ,loc);
+}
+
+<MID_LINE>"until" {
+    return issue(token::Token_UNTL, yytext ,loc);
+}
+
+<MID_LINE>"elif" {
+    // Handle the `def` keyword.
+    return issue(token::Token_ELIF, yytext ,loc);
+}
+
+<MID_LINE>"while" {
+    // Handle the `def` keyword.
+    return issue(token::Token_WHIL, yytext ,loc);
+}
+
+<MID_LINE>"," {
+    // Handle the `,` keyword.
+    return issue(token::Token_COMA, yytext ,loc);
+}
+
+<MID_LINE>":" {
+    // Handle the `:` keyword.
+    return issue(token::Token_COLN, yytext ,loc);
+}
+
+<MID_LINE>"return" {
+    // Handle the `return` keyword.
+    return issue(token::Token_RTRN, yytext ,loc);
+}
+
+<MID_LINE>"+=" {
+    // Handle the `+=` keyword.
+    return issue(token::Token_PLEQ, yytext ,loc);
+}
+
+<MID_LINE>"-=" {
+    // Handle the `-=` keyword.
+    return issue(token::Token_MNEQ, yytext ,loc);
+}
+
+<MID_LINE>"not" {
+    // Handle the `not` keyword.
+    return issue(token::Token_NEGT, yytext ,loc);
+}
+
+<MID_LINE>"and" {
+    // Handle the `and` keyword.
+    return issue(token::Token_CONJ, yytext ,loc);
+}
+
+<MID_LINE>"or" {
+    // Handle the `or` keyword.
+    return issue(token::Token_DISJ, yytext ,loc);
+}
+
+<MID_LINE>"==" {
+    // Handle the `==` keyword.
+    return issue(token::Token_CMEQ, yytext ,loc);
+}
+
+<MID_LINE>"<" {
+    // Handle the `<` keyword.
+    return issue(token::Token_CMLT, yytext ,loc);
+}
+
+<MID_LINE>">" {
+    // Handle the `>` keyword.
+    return issue(token::Token_CMGT, yytext ,loc);
+}
+
+<MID_LINE>"<=" {
+    // Handle the `<=` keyword.
+    return issue(token::Token_CMLE, yytext ,loc);
+}
+
+<MID_LINE>">=" {
+    // Handle the `!=` keyword.
+    return issue(token::Token_CMGE, yytext ,loc);
+}
+
+<MID_LINE>"->"{
+    // Handle the `->` keyword.
+    return issue(token::Token_ARRW, yytext ,loc);
+}
+
+
 <MID_LINE>"=" {
     return issue(token::Token_ASGN,yytext,loc);
 }
@@ -377,14 +481,6 @@ WSPC    {INDT}
     return issue(token::Token_TMES,yytext,loc);
 }
     
-<MID_LINE>":" {
-    return issue(token::Token_COLN,yytext,loc);
-}
-
-<MID_LINE>"," {
-    return issue(token::Token_CMMA,yytext,loc);
-}
-
 <MID_LINE>"//" {
     return issue(token::Token_IDIV,yytext,loc);
 }
@@ -395,50 +491,6 @@ WSPC    {INDT}
     
 <MID_LINE>print {
     return issue(token::Token_PRNT,yytext,loc);
-}
-    
-<MID_LINE>return {
-    return issue(token::Token_RTRN,yytext,loc);
-}
-    
-<MID_LINE>def {
-    return issue(token::Token_DEFN,yytext,loc);
-}
-    
-<MID_LINE>and {
-    return issue(token::Token_AND,yytext,loc);
-}
-    
-<MID_LINE>or {
-    return issue(token::Token_OR,yytext,loc);
-}
-    
-<MID_LINE>not {
-    return issue(token::Token_NOT,yytext,loc);
-}
-    
-<MID_LINE>"==" {
-    return issue(token::Token_EQUL,yytext,loc);
-}
-    
-<MID_LINE>"<=" {
-    return issue(token::Token_LSEQ,yytext,loc);
-}
-    
-<MID_LINE>"<" {
-    return issue(token::Token_LESS,yytext,loc);
-}
-    
-<MID_LINE>while {
-    return issue(token::Token_WHLE,yytext,loc);
-}
-    
-<MID_LINE>if {
-    return issue(token::Token_IFTN,yytext,loc);
-}
-    
-<MID_LINE>else {
-    return issue(token::Token_ELSE,yytext,loc);
 }
     
 <MID_LINE>pass {
@@ -469,14 +521,6 @@ WSPC    {INDT}
     return issue(token::Token_NONE,yytext,loc);
 }
     
-<MID_LINE>"->" {
-    return issue(token::Token_ARRW,yytext,loc);
-}
-    
-<MID_LINE>bool {
-    return issue(token::Token_BOOL,yytext,loc);
-}
-    
 <MID_LINE>{NAME} {
     // Handle identifier names.
     yylval->build<std::string>(yytext);
@@ -495,7 +539,14 @@ WSPC    {INDT}
 }
 
 <MID_LINE><<EOF>> {
-    return issue(token::Token_EOFL,"",loc);
+    std::cout << "size of indents " << indents.size();
+    if (indents.size()) {
+        yyless(0);
+        indents.pop_back();
+        return issue(token::Token_DEDT,"",loc);
+    } else {
+        return issue(token::Token_EOFL,"",loc);
+    }
 }
 
 <MID_LINE>. {

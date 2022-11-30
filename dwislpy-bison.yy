@@ -45,37 +45,45 @@
 %token               EOLN
 %token               INDT
 %token               DEDT
+
+%token               DEFF "def"
+%token               IFCD "if"
+%token               ELSE "else"
+%token               ELIF "elif"
+%token               WHIL "while"
+%token               COMA ","
+%token               COLN ":"
+%token               ARRW "->"
+%token               RTRN "return"
+%token               PLEQ "+="
+%token               MNEQ "-="
+%token               NEGT "not"
+%token               CONJ "and"
+%token               DISJ "or"
+%token               CMLT "<"
+%token               CMGT ">"
+%token               CMEQ "=="
+%token               CMLE "<="
+%token               CMGE ">="
+
 %token               PASS "pass"
 %token               PRNT "print"
 %token               INPT "input"
-%token               BOOL "bool"
 %token               INTC "int"
 %token               STRC "str"
-%token               DEFN "def"
-%token               RTRN "return"
-%token               AND  "and"
-%token               OR   "or"
-%token               NOT  "not"
-%token               IFTN "if"
-%token               ELSE "else"
-%token               WHLE "while"
-%token               ARRW "->"
 %token               ASGN "="
 %token               PLUS "+"
 %token               MNUS "-"
 %token               TMES "*"
 %token               IDIV "//"
 %token               IMOD "%"
-%token               LSEQ "<="
-%token               LESS "<"
-%token               EQUL "=="
 %token               LPAR "(" 
 %token               RPAR ")"
-%token               CMMA ","
-%token               COLN ":"
 %token               NONE "None"
 %token               TRUE "True"
 %token               FALS "False"
+%token               REPT "repeat"
+%token               UNTL "until"
 %token <int>         NMBR
 %token <std::string> NAME
 %token <std::string> STRG
@@ -83,22 +91,28 @@
 %type <Prgm_ptr> prgm
 %type <Defs>     defs
 %type <Defn_ptr> defn
-%type <SymT>     fmls
-%type <Type>     type
-%type <Expn_vec> exps
 %type <Blck_ptr> nest
 %type <Blck_ptr> blck
+%type <Args>     args
+%type <Args_vec> expns
 %type <Stmt_vec> stms
 %type <Stmt_ptr> stmt
 %type <Expn_ptr> expn
+%type <Ifcd_vec> elifb
+%type <Else_ptr> elseb
 
 %%
 
 %start main;
 
+
+%left DISJ;
+%left CONJ;
+%precedence NEGT;
+%left CMEQ CMLE CMGE CMLT CMGT;
 %left PLUS MNUS;
 %left TMES IMOD IDIV;
-    
+
 main:
   prgm {
       main.set($1);
@@ -106,81 +120,59 @@ main:
 ;
 
 prgm:
-  blck {
-      Defs ds { };
-      Blck_ptr b = $1; 
-      $$ = Prgm_ptr { new Prgm {ds, b, b->where()} };
-  }   
-| defs blck {
-      Defs     ds = $1;
-      Blck_ptr b  = $2; 
-      $$ = Prgm_ptr { new Prgm {ds, b, b->where()} };
+  defs blck {
+      Defs ds = $1; 
+      Blck_ptr b = $2;
+
+      $$ = Prgm_ptr { new Prgm {ds, b, lexer.locate(@1)} };
+  }
+| defs {
+      $$ = Prgm_ptr { new Prgm {$1, Blck_ptr{nullptr}, lexer.locate(@1)} };
   }
 ;
 
-defs: defn {
-      Defs ds { };
-      Defn_ptr d = $1;
-      ds[d->name] = d;
-      $$ = ds;
-  }
-| defs defn {
-      Defs ds = $1;
-      Defn_ptr d = $2;
-      ds[d->name] = d;
-      $$ = ds;
-  }
+defs:
+    defs defn {
+        Defs ds = $1;
+        ds.push_back($2);
+        $$ = ds;
+    }
+|   defn {
+        $$ = Defs {$1};
+    }
+|   {
+        $$ = Defs {};
+    }
 ;
 
-defn:
-  DEFN NAME LPAR RPAR ARRW type COLN EOLN nest {
-    SymT ps { };
-    $$ = Defn_ptr { new Defn {$2, ps, $6, $9, lexer.locate(@1)} };
-  }    
-| DEFN NAME LPAR RPAR COLN EOLN nest {
-    SymT ps { };
-    $$ = Defn_ptr { new Defn {$2, ps, NoneTy {}, $7, lexer.locate(@1)} };
-  }    
-| DEFN NAME LPAR fmls RPAR ARRW type COLN EOLN nest {
-    $$ = Defn_ptr { new Defn {$2, $4, $7, $10, lexer.locate(@1)} };
-  }
-| DEFN NAME LPAR fmls RPAR COLN EOLN nest {
-    $$ = Defn_ptr { new Defn {$2, $4, NoneTy {}, $8, lexer.locate(@1)} };
-  }
+args:
+    args COMA NAME {
+        Args as = $1;
+        as.push_back($3);
+        $$ = as;
+    }
+|   NAME {
+        $$ = Args {$1};
+    }
+|   {
+        Args as {};
+        $$ = as;
+    }
 ;
 
-fmls:
-  NAME COLN type {
-    SymT ps { };
-    ps.add_frml($1,$3);
-    $$ = ps;
-  }
-| fmls CMMA NAME COLN type {
-    SymT ps = $1;
-    ps.add_frml($3,$5);
-    $$ = ps;
-  }
+defn: 
+    DEFF NAME LPAR args RPAR COLN EOLN nest {
+        $$ = Defn_ptr { new Defn { $2, $4, $8, $8->where() } };
+    }
 ;
 
-type:
-  INTC {
-    $$ = IntTy {};
-  }
-| STRC {
-    $$ = StrTy {};
-  }
-| BOOL {
-    $$ = BoolTy {};
-  }
-| NONE {
-    $$ = NoneTy {};
-  }
-;
-        
-nest:
-  INDT blck DEDT {
-    $$ = $2;
-  }
+nest: 
+    INDT blck DEDT {
+        $$ = $2;
+    }
+|   INDT blck EOFL {
+        $$ = $2; 
+    }
 ;
 
 blck:
@@ -204,52 +196,101 @@ stms:
 ;
   
 stmt: 
-  NAME COLN type ASGN expn EOLN {
-      $$ = Ntro_ptr { new Ntro {$1,$3,$5,lexer.locate(@2)} };
+  expn EOLN{
+    $1->make_stmt();
+    $$ = $1;
   }
+
+| REPT COLN EOLN nest UNTL expn EOLN {
+    $$ = Rept_ptr { new Rept { $6, $4, lexer.locate(@1) } };
+  }
+
 | NAME ASGN expn EOLN {
       $$ = Asgn_ptr { new Asgn {$1,$3,lexer.locate(@2)} };
   }
+
+| NAME PLEQ expn EOLN {
+      $$ = Pleq_ptr { new Pleq {$1, $3, lexer.locate(@2)} };
+  }
+
+| NAME MNEQ expn EOLN {
+      $$ = Mneq_ptr { new Mneq {$1, $3, lexer.locate(@2)} };
+  }
+
+| IFCD expn COLN EOLN nest elifb elseb {
+      $6.push_back(Ifcd_ptr {new Ifcd {$2, $5, $2->where()}});
+      $$ = Cond_ptr { new Cond {$6, $7, lexer.locate(@1)} };
+  }
+
+| WHIL expn COLN EOLN nest {
+      $$ = Whil_ptr { new Whil {$2, $5, lexer.locate(@1)} };
+  }
+
+| RTRN expn EOLN {
+      $$ = Rtrn_ptr { new Rtrn {$2, lexer.locate(@1)} };
+  }
+
+| RTRN EOLN {
+      $$ = Rtrn_ptr { new Rtrn {lexer.locate(@1)} };
+  }
+
 | PASS EOLN {
       $$ = Pass_ptr { new Pass {lexer.locate(@1)} };
   }
-| PRNT LPAR expn RPAR EOLN {
+| PRNT LPAR expns RPAR EOLN {
       $$ = Prnt_ptr { new Prnt {$3,lexer.locate(@1)} };
-  }
-| NAME LPAR exps RPAR EOLN {
-      $$ = PCll_ptr { new PCll {$1,$3,lexer.locate(@1)} };
-  }
-| NAME LPAR RPAR EOLN {
-      Expn_vec ps { };
-      $$ = PCll_ptr { new PCll {$1,ps,lexer.locate(@1)} };
-  }
-| RTRN expn EOLN {
-      $$ = FRtn_ptr { new FRtn {$2,lexer.locate(@1)} };
-  }
-| RTRN EOLN {
-      $$ = PRtn_ptr { new PRtn {lexer.locate(@1)} };
   }
 ;
 
-exps:
-  expn {
-    Expn_vec ps { };
-    ps.push_back($1);
-    $$ = ps;
-  }
-| exps CMMA expn {
-    Expn_vec ps = $1;
-    ps.push_back($3);
-    $$ = ps;
-  }
+elifb: 
+    elifb ELIF expn COLN EOLN nest {
+        $1.push_back(Ifcd_ptr {new Ifcd {$3, $6, $3->where()}});
+        $$ = $1;   
+    }
+|   {
+        $$ = Ifcd_vec {};
+    }
 ;
-    
+
+elseb:
+    ELSE COLN EOLN nest {
+        $$ = Else_ptr { new Else {$4, $4->where()} };
+    }
+|   {
+        $$ = Else_ptr { nullptr };
+    }
+;
+
+expns:
+    expns COMA expn {
+        $1.push_back($3);
+        $$ = $1;
+    }
+|   expn {
+        $$ = Expn_vec {$1};
+    }
+|   {
+        $$ = Expn_vec {};
+    }
+;
+
 expn:
-  expn PLUS expn {
+  NAME LPAR expns RPAR {
+    $$ = Call_ptr { new Call {$1, $3, lexer.locate(@1)} };
+  }
+
+| expn IFCD expn ELSE expn {
+    $$ = Inif_ptr { new Inif {$1, $3, $5, $1->where()} };
+  }
+
+| expn PLUS expn {
       $$ = Plus_ptr { new Plus {$1,$3,lexer.locate(@2)} };
   }
 | expn MNUS expn {
       $$ = Mnus_ptr { new Mnus {$1,$3,lexer.locate(@2)} };
+  }
+| MNUS expn {
+      $$ = Imus_ptr { new Imus {$2, lexer.locate(@1)} };
   }
 | expn TMES expn {
       $$ = Tmes_ptr { new Tmes {$1,$3,lexer.locate(@2)} };
@@ -260,6 +301,31 @@ expn:
 | expn IMOD expn {
       $$ = IMod_ptr { new IMod {$1,$3,lexer.locate(@2)} };
   }
+| expn CMLT expn {
+      $$ = Cmlt_ptr { new Cmlt {$1,$3,lexer.locate(@2)} };
+  }
+| expn CMGT expn {
+      $$ = Cmgt_ptr { new Cmgt {$1,$3,lexer.locate(@2)} };
+  }
+| expn CMLE expn {
+      $$ = Cmle_ptr { new Cmle {$1,$3,lexer.locate(@2)} };
+  }
+| expn CMGE expn {
+    $$ = Cmge_ptr { new Cmge {$1,$3,lexer.locate(@2)} };
+  }
+| expn CMEQ expn {
+    $$ = Cmeq_ptr { new Cmeq {$1,$3,lexer.locate(@2)} };
+  }
+| expn CONJ expn {
+    $$ = Conj_ptr { new Conj {$1,$3,lexer.locate(@2)} };
+  }
+| expn DISJ expn {
+    $$ = Disj_ptr { new Disj {$1,$3,lexer.locate(@2)} };
+  }
+| NEGT expn {
+    $$ = Negt_ptr { new Negt {$2,lexer.locate(@1)} };
+  }
+
 | NMBR {
       $$ = Ltrl_ptr { new Ltrl {Valu {$1},lexer.locate(@1)} };
   }
@@ -286,13 +352,6 @@ expn:
   }
 | NAME {
       $$ = Lkup_ptr { new Lkup {$1,lexer.locate(@1)} };
-  }
-| NAME LPAR RPAR {
-      Expn_vec ps { };
-      $$ = FCll_ptr { new FCll {$1,ps,lexer.locate(@1)} };
-  }
-| NAME LPAR exps RPAR {
-      $$ = FCll_ptr { new FCll {$1,$3,lexer.locate(@1)} };
   }
 | LPAR expn RPAR {
       $$ = $2;
