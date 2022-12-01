@@ -1,3 +1,4 @@
+#include <optional>
 #include <string>
 #include <vector>
 #include <unordered_map>
@@ -8,12 +9,12 @@
 #include <exception>
 #include <algorithm>
 #include <sstream>
-#include <variant>
-#include <optional>
 
 #include "dwislpy-ast.hh"
-#include "dwislpy-util.hh"
 #include "dwislpy-check.hh"
+#include "dwislpy-util.hh"
+
+const std::string DEFAULT_INDENT_STR = "    ";
 
 //
 // dwislpy-ast.cc
@@ -91,22 +92,11 @@ std::string to_repr(Valu v) {
 
 void Prgm::run(void) const {
     Ctxt main_ctxt { };
-    main->exec(defs,main_ctxt);
+    if (main) {
+        main->exec(defs,main_ctxt);
+    }
 }
 
-std::optional<Valu> Defn::call(const Defs& defs,
-                               const Expn_vec& args,
-                               const Ctxt& ctxt) {
-    Ctxt locals {};
-    int i=0;
-    for (Expn_ptr expn : args) {
-        std::string local = formal(i)->name;
-        i++;
-        Valu value = expn->eval(defs,ctxt);
-        locals[local] = value;
-    }
-    return body->exec(defs, locals);
-}
 
 std::optional<Valu> Blck::exec(const Defs& defs, Ctxt& ctxt) const {
     for (Stmt_ptr s : stmts) {
@@ -124,9 +114,8 @@ std::optional<Valu> Asgn::exec(const Defs& defs,
     return std::nullopt;
 }
 
-std::optional<Valu> Ntro::exec(const Defs& defs,
-                               Ctxt& ctxt) const {
-    ctxt[name] = expn->eval(defs,ctxt);
+std::optional<Valu> Ntro::exec(const Defs &defs, Ctxt &ctxt) const {
+    ctxt[name] = expn->eval(defs, ctxt);
     return std::nullopt;
 }
 
@@ -137,63 +126,101 @@ std::optional<Valu> Pass::exec([[maybe_unused]] const Defs& defs,
 }
   
 std::optional<Valu> Prnt::exec(const Defs& defs, Ctxt& ctxt) const {
-    std::cout << to_string(expn->eval(defs,ctxt)) << std::endl;
+    if (expns.size()) {
+        std::cout << to_string(expns[0]->eval(defs,ctxt));
+    }
+    for (size_t i = 1; i < expns.size(); i++) {
+        std::cout << " " << to_string(expns[i]->eval(defs,ctxt));
+    }
+    std::cout << std::endl;
     return std::nullopt;
 }
 
-std::optional<Valu> PCll::exec(const Defs& defs, Ctxt& ctxt) const {
-    if (defs.count(name) == 0) {
-        std::string msg = "Run-time error: procedure '" + name +"'";
-        msg += " is not defined.";
-        throw DwislpyError { where(), msg };
+std::optional<Valu> Pleq::exec(const Defs& defs, Ctxt& ctxt) const {
+    Valu& val = ctxt[name];
+
+    if (std::holds_alternative<int>(val)) {
+        ctxt[name] = Valu(std::get<int>(val) + std::get<int>(expn->eval(defs,ctxt)));
+    } else if (std::holds_alternative<std::string>(val)) {
+        ctxt[name] = Valu(std::get<std::string>(val) + std::get<std::string>(expn->eval(defs,ctxt)));
+    } else if (std::holds_alternative<bool>(val)) {
+        ctxt[name] = Valu(std::get<bool>(val) + std::get<bool>(expn->eval(defs,ctxt)));
     }
-    Defn_ptr defn = defs.at(name);
-    if (defn->arity() != params.size()) {
-        std::string msg = "Run-time error: wrong number of arguments to ";
-        msg += "procedure '" + name +"'.";
-        throw DwislpyError { where(), msg };
-    }
-    defn->call(defs,params,ctxt);
     return std::nullopt;
 }
-    
-std::optional<Valu> PRtn::exec([[maybe_unused]] const Defs& defs,
-                               [[maybe_unused]] Ctxt& ctxt) const {
-    return std::optional<Valu> { Valu { None } };
+
+
+std::optional<Valu> Mneq::exec(const Defs& defs, Ctxt& ctxt) const {
+    Valu& val = ctxt[name];
+
+    if (std::holds_alternative<int>(val)) {
+        ctxt[name] = Valu(std::get<int>(val) - std::get<int>(expn->eval(defs,ctxt)));
+    } else if (std::holds_alternative<std::string>(val)) {
+        throw std::logic_error("Cannot subtract strings");
+    } else if (std::holds_alternative<bool>(val)) {
+        ctxt[name] = Valu(std::get<bool>(val) - std::get<bool>(expn->eval(defs,ctxt)));
+    }
+    return std::nullopt;
 }
+
+
+std::optional<Valu> Ifcd::exec([[maybe_unused]]const Defs& defs, [[maybe_unused]]Ctxt& ctxt) const {
+    return std::nullopt;
+}
+
+std::optional<Valu> Cond::exec(const Defs& defs, Ctxt& ctxt) const {
+    for (auto ifcd : ifcds) {
+        if (std::get<bool>(ifcd->cond->eval(defs,ctxt))) {
+            return ifcd->body->exec(defs,ctxt);
+        }
+    }
+    if (els) {
+        return els -> exec(defs, ctxt);
+    } else {
+        return std::nullopt;
+    }
+}
+
+
+std::optional<Valu> Else::exec(const Defs& defs, Ctxt& ctxt) const {
+    return body->exec(defs,ctxt);
+}
+
+
+std::optional<Valu> Elif::exec(const Defs& defs, Ctxt& ctxt) const {
+    if (std::get<bool>(cond->eval(defs,ctxt))) {
+        return cond->eval(defs,ctxt);
+    } else {
+        return body->exec(defs,ctxt);
+    }
+}
+
+
+std::optional<Valu> Whil::exec(const Defs& defs, Ctxt& ctxt) const {
+    while (std::get<bool>(cond->eval(defs,ctxt))) {
+        body->exec(defs,ctxt);
+    }
+    return std::nullopt;
+}
+
+
+std::optional<Valu> Rept::exec(const Defs &defs, Ctxt &ctxt) const {
+    do {
+        body->exec(defs,ctxt);
+    } while (!std::get<bool>(cond->eval(defs,ctxt)));
+    return std::nullopt;
+}
+
 
 std::optional<Valu> FRtn::exec(const Defs& defs, Ctxt& ctxt) const {
-    return std::optional<Valu> { expn->eval(defs, ctxt) };
+    return expn->eval(defs,ctxt);
 }
 
-std::optional<Valu> IfEl::exec(const Defs& defs, Ctxt& ctxt) const {
-    Valu cond = cndn->eval(defs,ctxt);
-    if (!std::holds_alternative<bool>(cond)) {
-        std::string msg = "Run-time error: condition not a boolean.";
-        throw DwislpyError { where(), msg };
-    }
-    if (std::get<bool>(cond)) {
-        return then_blck->exec(defs,ctxt);
-    } else {
-        return else_blck->exec(defs,ctxt);
-    }
-}
- 
-std::optional<Valu> Whle::exec(const Defs& defs, Ctxt& ctxt) const {
-    Valu cond = cndn->eval(defs,ctxt);
-    while (std::holds_alternative<bool>(cond) && std::get<bool>(cond)) {
-        std::optional<Valu> maybe_return = blck->exec(defs,ctxt);
-        if (maybe_return.has_value()) {
-            return maybe_return;
-        }
-        cond = cndn->eval(defs,ctxt);
-    }
-    if (!std::holds_alternative<bool>(cond)) {
-        std::string msg = "Run-time error: condition not a boolean.";
-        throw DwislpyError { where(), msg };
-    }
+std::optional<Valu> PRtn::exec([[maybe_unused]]const Defs& defs, [[maybe_unused]]Ctxt& ctxt) const {
     return std::nullopt;
 }
+
+
 
 //
 // Expn::eval
@@ -201,6 +228,92 @@ std::optional<Valu> Whle::exec(const Defs& defs, Ctxt& ctxt) const {
 //  - evaluate DWISLPY expressions within a runtime context to determine their
 //    (integer) value.
 //
+
+Valu Defn::exec(const Defs& defs, const Ctxt& ctxt, const Args_vec& vec) const {
+    Ctxt new_ctxt { ctxt };
+    if (args.get_frmls_size() != vec.size()) {
+        throw std::logic_error("Wrong number of arguments");
+    }
+
+    for (size_t i = 0; i < args.get_frmls_size(); i++) {
+        new_ctxt[args.get_frml(i)->name] = vec[i]->eval(defs, ctxt);
+    }
+    // handle return later 
+    return body->exec(defs,new_ctxt).value_or(None);
+}
+
+
+Valu FCll::eval(const Defs& defs, const Ctxt& ctxt) const {
+    auto fn_iter = defs.find(name);
+    if (fn_iter == defs.end()) {
+        throw std::logic_error("Function not found");
+    }
+    return fn_iter->second->exec(defs, ctxt, args);
+}
+
+
+std::optional<Valu> PCll::exec(const Defs& defs, Ctxt& ctxt) const {
+    auto fn_iter = defs.find(name);
+    if (fn_iter == defs.end()) {
+        throw std::logic_error("Function not found");
+    }
+   fn_iter->second->exec(defs, ctxt, args);
+   return std::nullopt;
+}
+
+
+Valu Inif::eval(const Defs& defs, const Ctxt& ctxt) const {
+    if (std::get<bool>(cond->eval(defs, ctxt))) {
+        return if_br->eval(defs, ctxt); 
+    } else {
+        return else_br->eval(defs, ctxt);
+    }
+}
+
+Valu Negt::eval(const Defs& defs, const Ctxt& ctxt) const {
+    return Valu(!std::get<bool>(expn->eval(defs,ctxt)));
+}
+
+Valu Imus::eval(const Defs& defs, const Ctxt& ctxt) const {
+    return Valu(-std::get<int>(expn->eval(defs, ctxt)));
+}
+
+
+Valu Conj::eval(const Defs& defs, const Ctxt& ctxt) const {
+    return Valu(std::get<bool>(lft->eval(defs,ctxt)) && std::get<bool>(rht->eval(defs,ctxt)));
+};
+
+
+Valu Disj::eval(const Defs& defs, const Ctxt& ctxt) const {
+    return Valu(std::get<bool>(lft->eval(defs,ctxt)) || std::get<bool>(rht->eval(defs,ctxt)));
+};
+
+
+Valu Cmlt::eval(const Defs& defs, const Ctxt& ctxt) const {
+    return Valu(std::get<int>(lft->eval(defs,ctxt)) < std::get<int>(rht->eval(defs,ctxt)));
+};
+
+
+Valu Cmgt::eval(const Defs& defs, const Ctxt& ctxt) const {
+    return Valu(std::get<int>(lft->eval(defs,ctxt)) > std::get<int>(rht->eval(defs,ctxt)));
+};
+
+
+Valu Cmeq::eval(const Defs& defs, const Ctxt& ctxt) const {
+    return Valu(std::get<int>(lft->eval(defs,ctxt)) == std::get<int>(rht->eval(defs,ctxt)));
+};
+
+
+Valu Cmle::eval(const Defs& defs, const Ctxt& ctxt) const {
+    return Valu(std::get<int>(lft->eval(defs,ctxt)) <= std::get<int>(rht->eval(defs,ctxt)));
+};
+
+
+Valu Cmge::eval(const Defs& defs, const Ctxt& ctxt) const {
+    return Valu(std::get<int>(lft->eval(defs,ctxt)) >= std::get<int>(rht->eval(defs,ctxt)));
+};
+
+
 
 Valu Plus::eval(const Defs& defs, const Ctxt& ctxt) const {
     Valu lv = left->eval(defs,ctxt);
@@ -285,122 +398,6 @@ Valu IMod::eval(const Defs& defs, const Ctxt& ctxt) const {
         throw DwislpyError { where(), msg };
     }        
 }
-
-Valu Less::eval(const Defs& defs, const Ctxt& ctxt) const {
-    Valu lv = left->eval(defs,ctxt);
-    Valu rv = rght->eval(defs,ctxt);
-    if (std::holds_alternative<int>(lv)
-        && std::holds_alternative<int>(rv)) {
-        int ln = std::get<int>(lv);
-        int rn = std::get<int>(rv);
-        return Valu {ln < rn};
-    } else if (std::holds_alternative<std::string>(lv)
-               && std::holds_alternative<std::string>(rv)) {
-        std::string ls = std::get<std::string>(lv);
-        std::string rs = std::get<std::string>(rv);
-        return Valu {ls < rs};
-    } else if (std::holds_alternative<bool>(lv)
-               && std::holds_alternative<bool>(rv)) {
-        bool lb = std::get<bool>(lv);
-        bool rb = std::get<bool>(rv);
-        return Valu {!lb && rb};
-    } else {
-        std::string msg = "Run-time error: wrong operand type for comparison.";
-        throw DwislpyError { where(), msg };
-    }        
-}
-
-Valu Equl::eval(const Defs& defs, const Ctxt& ctxt) const {
-    Valu lv = left->eval(defs,ctxt);
-    Valu rv = rght->eval(defs,ctxt);
-    if (std::holds_alternative<int>(lv)
-        && std::holds_alternative<int>(rv)) {
-        int ln = std::get<int>(lv);
-        int rn = std::get<int>(rv);
-        return Valu {ln == rn};
-    } else if (std::holds_alternative<std::string>(lv)
-               && std::holds_alternative<std::string>(rv)) {
-        std::string ls = std::get<std::string>(lv);
-        std::string rs = std::get<std::string>(rv);
-        return Valu {ls == rs};
-    } else if (std::holds_alternative<bool>(lv)
-               && std::holds_alternative<bool>(rv)) {
-        bool lb = std::get<bool>(lv);
-        bool rb = std::get<bool>(rv);
-        return Valu {lb == rb};
-    } else if (std::holds_alternative<none>(lv)
-               && std::holds_alternative<none>(rv)) {
-        return Valu {true};
-    } else {
-        return Valu {false};
-    }        
-}
-
-Valu LsEq::eval(const Defs& defs, const Ctxt& ctxt) const {
-    Valu lv = left->eval(defs,ctxt);
-    Valu rv = rght->eval(defs,ctxt);
-    if (std::holds_alternative<int>(lv)
-        && std::holds_alternative<int>(rv)) {
-        int ln = std::get<int>(lv);
-        int rn = std::get<int>(rv);
-        return Valu {ln <= rn};
-    } else if (std::holds_alternative<std::string>(lv)
-               && std::holds_alternative<std::string>(rv)) {
-        std::string ls = std::get<std::string>(lv);
-        std::string rs = std::get<std::string>(rv);
-        return Valu {ls <= rs};
-    } else if (std::holds_alternative<bool>(lv)
-               && std::holds_alternative<bool>(rv)) {
-        bool lb = std::get<bool>(lv);
-        bool rb = std::get<bool>(rv);
-        return Valu {!lb || rb};
-    } else {
-        std::string msg = "Run-time error: wrong operand type for comparison.";
-        throw DwislpyError { where(), msg };
-    }        
-}
-
-Valu And::eval(const Defs& defs, const Ctxt& ctxt) const {
-    Valu lv = left->eval(defs,ctxt);
-    if (std::holds_alternative<bool>(lv)) {
-        bool lb = std::get<bool>(lv);
-        if (lb) {
-            return rght->eval(defs,ctxt);
-        } else {
-            return lv;
-        }
-    } else {
-        std::string msg = "Run-time error: wrong operand type for conjunction.";
-        throw DwislpyError { where(), msg };
-    }        
-}
-
-Valu Or::eval(const Defs& defs, const Ctxt& ctxt) const {
-    Valu lv = left->eval(defs,ctxt);
-    if (std::holds_alternative<bool>(lv)) {
-        bool lb = std::get<bool>(lv);
-        if (lb) {
-            return lv;
-        } else {
-            return rght->eval(defs,ctxt);
-        }
-    } else {
-        std::string msg = "Run-time error: wrong operand type for disjunction.";
-        throw DwislpyError { where(), msg };
-    }        
-}
-
-Valu Not::eval(const Defs& defs, const Ctxt& ctxt) const {
-    Valu ev = expn->eval(defs,ctxt);
-    if (std::holds_alternative<bool>(ev)) {
-        bool eb = std::get<bool>(ev);
-        return Valu { !eb };
-    } else {
-        std::string msg = "Run-time error: wrong operand type for logical negation.";
-        throw DwislpyError { where(), msg };
-    }        
-}
-
 Valu Ltrl::eval([[maybe_unused]] const Defs& defs,
                 [[maybe_unused]] const Ctxt& ctxt) const {
     return valu;
@@ -434,6 +431,10 @@ Valu Inpt::eval([[maybe_unused]] const Defs& defs, const Ctxt& ctxt) const {
 }
 
 Valu IntC::eval([[maybe_unused]] const Defs& defs, const Ctxt& ctxt) const {
+    //
+    // The integer conversion operation does nothing in this
+    // version of DWISLPY.
+    //
     Valu v = expn->eval(defs,ctxt);
     if (std::holds_alternative<int>(v)) {
         return Valu {v};
@@ -465,27 +466,6 @@ Valu StrC::eval([[maybe_unused]] const Defs& defs, const Ctxt& ctxt) const {
     return Valu { to_string(v) };
 }
 
-Valu FCll::eval(const Defs& defs, const Ctxt& ctxt) const {
-    if (defs.count(name) == 0) {
-        std::string msg = "Run-time error: function '" + name +"'";
-        msg += " is not defined.";
-        throw DwislpyError { where(), msg };
-    }
-    Defn_ptr defn = defs.at(name);
-    if (defn->arity() != params.size()) {
-        std::string msg = "Run-time error: wrong number of arguments to ";
-        msg += "function '" + name +"'.";
-        throw DwislpyError { where(), msg };
-    }
-    std::optional<Valu> result = defn->call(defs,params,ctxt);
-    if (!result.has_value()) {
-        std::string msg = "Run-time error: no value returned from ";
-        msg += "function '" + name +"'.";
-        throw DwislpyError { where(), msg };
-    }
-    return result.value();
-}
-
 // * * * * *
 //
 // AST::output
@@ -498,27 +478,203 @@ Valu FCll::eval(const Defs& defs, const Ctxt& ctxt) const {
 //
 //
 
+void Pleq::output(std::ostream& os, std::string indent) const {
+    os << indent << this->name << " += ";
+    expn->output(os, indent);
+    os << std::endl;
+}
+
+void Mneq::output(std::ostream& os, std::string indent) const {
+    os << indent << this->name << " -= ";
+    expn->output(os, indent);
+    os << std::endl;
+
+}
+
+void Cond::output(std::ostream& os, std::string indent) const {
+    this->ifcds[0]->output(os, indent);
+
+    for (size_t index = 1; index < this->ifcds.size(); index++) {
+        this->ifcds[index]->output(os, indent);
+    }
+
+    if (this->els) {
+        this->els->output(os, indent);
+    }
+}
+
+void Ifcd::output(std::ostream& os, std::string indent) const {
+    os << indent << "if ";
+    this->cond->output(os, indent);
+    os << std::endl;
+    this->body->output(os, indent + DEFAULT_INDENT_STR);
+    os<<std::endl;
+}
+
+void Else::output(std::ostream& os, std::string indent) const {
+    os << indent << "else" << std::endl;
+    this->body->output(os, indent + DEFAULT_INDENT_STR);
+    os<<std::endl;
+}
+
+void Elif::output(std::ostream& os, std::string indent) const {
+    os << indent << "elif ";
+    this->cond->output(os, indent);
+    os << std::endl;
+    this->body->output(os, indent + DEFAULT_INDENT_STR);
+    os<<std::endl;
+
+}
+
+void Whil::output(std::ostream& os, std::string indent) const {
+    os << indent << "while ";
+    this->cond->output(os, indent);
+    os << ": " << std::endl;
+    this->body->output(os, indent + DEFAULT_INDENT_STR);
+    os<<std::endl;
+}
+
+void Rept::output(std::ostream &os, std::string indent) const {
+    os << indent << "repeat ";
+    this->body->output(os, indent + DEFAULT_INDENT_STR);
+    os << std::endl;
+    this->cond->output(os, indent);
+    os<<std::endl;
+}
+
+void FRtn::output(std::ostream& os, std::string indent) const {
+    os << indent << "return ";
+    this->expn->output(os, indent);
+    os << std::endl;
+}
+
+void PRtn::output(std::ostream &os, std::string indent) const {
+    os << indent << "return ";
+    os << std::endl;
+}
+
+void Inif::output(std::ostream &os) const {
+    this->if_br->output(os); 
+    os << " if ";
+    this->cond->output(os);
+    os << " else ";
+    this->else_br->output(os);
+}
+
+void Negt::output(std::ostream& os) const {
+    os << "not ";
+    this->expn->output(os);
+}
+
+void Imus::output(std::ostream& os) const {
+    os << "-";
+    this->expn->output(os);
+}
+
+void Conj::output(std::ostream& os) const {
+    this->lft->output(os);
+    os << " and ";
+    this->rht->output(os);
+}
+    
+void Disj::output(std::ostream& os) const {
+    this->lft->output(os);
+    os << " or ";
+    this->rht->output(os);
+}
+    
+void Cmlt::output(std::ostream& os) const {
+    this->lft->output(os);
+    os << " < ";
+    this->rht->output(os);
+}
+    
+void Cmgt::output(std::ostream& os) const {
+    this->lft->output(os);
+    os << " < ";
+    this->rht->output(os);
+}
+    
+void Cmeq::output(std::ostream& os) const {
+    this->lft->output(os);
+    os << " == ";
+    this->rht->output(os);
+}
+    
+void Cmle::output(std::ostream& os) const {
+    this->lft->output(os);
+    os << " <= ";
+    this->rht->output(os);
+}
+    
+void Cmge::output(std::ostream& os) const {
+    this->lft->output(os);
+    os << " >= ";
+    this->rht->output(os);
+}
+    
+
 void Prgm::output(std::ostream& os) const {
-    for (std::pair<Name,Defn_ptr> dfpr : defs) {
-        dfpr.second->output(os);
+    for (auto defn : defs) {
+        defn.second->output(os);
     }
     main->output(os);
 }
 
 void Defn::output(std::ostream& os) const {
-    os << "def " << name << "(";
-    bool comma = false;
-    for (unsigned int i=0; i < arity(); i++) {
-        if (comma) {
-            os << ",";
-        }
-        SymInfo_ptr frml = formal(i);
-        os << frml->name << ":" << type_name(frml->type);
-    }
-    os << "):" << std::endl;
-    body->output(os,"    ");
+    this->output(os, "");
 }
 
+void dump_args(const Fmag& args, std::ostream& os) {
+    if (args.get_frmls_size()) {
+        auto arg = args.get_frml(0);
+        os << arg->name << std::endl;
+        os << get_type_str(arg->type) << std::endl;
+        for (size_t index = 1; index < args.get_frmls_size(); index++) {
+            os << arg->name << std::endl;
+            os << get_type_str(arg->type) << std::endl;
+        }
+    }
+}
+
+void dump_args(const Args_vec& args, int level) {
+    if (args.size()) {
+        args[0]->dump(level);
+        for (size_t index = 1; index < args.size(); index++) {
+            args[index]->dump(level);
+        }
+    }
+}
+
+void output_args(const Args_vec& args, std::ostream& os) {
+    if (args.size()) {
+        args[0]->output(os);
+        for (size_t index = 1; index < args.size(); index++) {
+            os << ", ";
+            args[index]->output(os);
+        }
+    }
+}
+
+void Defn::output(std::ostream& os, std::string indent) const {
+    // Your code goes here.
+    os << "def " << name << "(";
+    dump_args(args, os);
+    os << "): " << std::endl; // BOGUS to shut up compiler warning.
+    body->output(os, indent + DEFAULT_INDENT_STR);
+}
+
+void PCll::output(std::ostream& os, std::string indent) const {
+    os << indent <<  name << "(";
+    output_args(args, os);
+    os << ")";
+}
+
+void FCll::output(std::ostream& os) const {
+    os << name << "(";
+    output_args(args, os);
+    os << ")";
+}
 
 void Blck::output(std::ostream& os, std::string indent) const {
     for (Stmt_ptr s : stmts) {
@@ -528,7 +684,7 @@ void Blck::output(std::ostream& os, std::string indent) const {
 
 void Blck::output(std::ostream& os) const {
     for (Stmt_ptr s : stmts) {
-        s->output(os);
+        s->output(os, "");
     }
 }
 
@@ -536,17 +692,16 @@ void Stmt::output(std::ostream& os) const {
     output(os,"");
 }
 
-void Asgn::output(std::ostream& os, std::string indent) const {
-    os << indent;
-    os << name << " = ";
-    expn->output(os);
+void Ntro::output(std::ostream& os, std::string indent) const {
+    os << indent << name << ": " << get_type_str(type) << " = ";
+    this->expn->output(os, indent);
     os << std::endl;
 }
 
-void Ntro::output(std::ostream& os, std::string indent) const {
+void Asgn::output(std::ostream& os, std::string indent) const {
     os << indent;
-    os << name << " : " << type_name(type) << " = ";
-    expn->output(os);
+    os << name << " = ";
+    expn->output(os, indent);
     os << std::endl;
 }
 
@@ -558,60 +713,14 @@ void Prnt::output(std::ostream& os, std::string indent) const {
     os << indent;
     os << "print";
     os << "(";
-    expn->output(os);
-    os << ")";
-    os << std::endl;
-}
-
-void Whle::output(std::ostream& os, std::string indent) const {
-    os << indent;
-    os << "while ";
-    cndn->output(os);
-    os << ":";
-    os << std::endl;
-    blck->output(os,indent + "    ");
-}
-
-void IfEl::output(std::ostream& os, std::string indent) const {
-    os << indent;
-    os << "if ";
-    cndn->output(os);
-    os << ":";
-    os << std::endl;
-    then_blck->output(os,indent + "    ");
-    os << "else:";
-    os << std::endl;
-    else_blck->output(os,indent + "    ");
-}
-
-void PRtn::output(std::ostream& os, std::string indent) const {
-    os << indent;
-    os << "return";
-    os << std::endl;
-}
-
-void FRtn::output(std::ostream& os, std::string indent) const {
-    os << indent;
-    os << "return ";
-    expn->output(os);
-    os << std::endl;
-}
-
-void PCll::output(std::ostream& os, std::string indent) const {
-    os << indent;
-    os << name << "(";
-    bool comma = false;
-    for (Expn_ptr expn : params) {
-        if (comma) {
-            os << ",";
-        }
-        expn->output(os);
-        comma = true;
+    if (expns.size()) {
+        expns[0]->output(os, indent);
     }
+    for (size_t i = 1; i < expns.size(); i++)
+        expns[i]->output(os, indent);
     os << ")";
     os << std::endl;
 }
-
 
 void Plus::output(std::ostream& os) const {
     os << "(";
@@ -653,52 +762,6 @@ void IMod::output(std::ostream& os) const {
     os << ")";
 }
 
-void Less::output(std::ostream& os) const {
-    os << "(";
-    left->output(os);
-    os << " < ";
-    rght->output(os);
-    os << ")";
-}
-
-void LsEq::output(std::ostream& os) const {
-    os << "(";
-    left->output(os);
-    os << " <= ";
-    rght->output(os);
-    os << ")";
-}
-
-void Equl::output(std::ostream& os) const {
-    os << "(";
-    left->output(os);
-    os << " == ";
-    rght->output(os);
-    os << ")";
-}
-
-void And::output(std::ostream& os) const {
-    os << "(";
-    left->output(os);
-    os << " and ";
-    rght->output(os);
-    os << ")";
-}
-
-void Or::output(std::ostream& os) const {
-    os << "(";
-    left->output(os);
-    os << " or ";
-    rght->output(os);
-    os << ")";
-}
-
-void Not::output(std::ostream& os) const {
-    os << "(not ";
-    expn->output(os);
-    os << ")";
-}
-
 void Ltrl::output(std::ostream& os) const {
     os << to_repr(valu);
 }
@@ -725,19 +788,6 @@ void StrC::output(std::ostream& os) const {
     os << ")";
 }
 
-void FCll::output(std::ostream& os) const {
-    os << name << "(";
-    bool comma = false;
-    for (Expn_ptr expn : params) {
-        if (comma) {
-            os << ",";
-        }
-        expn->output(os);
-        comma = true;
-    }
-    os << ")";
-}
-
 
 // * * * * *
 //
@@ -756,26 +806,191 @@ void dump_indent(int level) {
     }
 }
 
+
+void Ntro::dump(int level) const {
+    dump_indent(level);
+    std::cout << "Ntro: " << name << " : " << get_type_str(type) << std::endl;
+    dump_indent(level + 1);
+    expn->dump(level + 1);
+}
+
+void Pleq::dump(int level) const {
+    dump_indent(level);
+    std::cout << "Pleq" << std::endl;
+    dump_indent(level + 1);
+    std::cout << name << std::endl;
+    expn->dump(level+1);
+};
+
+void Mneq::dump(int level) const {
+    dump_indent(level);
+    std::cout << "Pleq" << std::endl;
+    dump_indent(level + 1);
+    std::cout << name << std::endl;
+    expn->dump(level+1);
+};
+
+void Cond::dump(int level) const {
+    for (auto ifcd : ifcds) {
+        ifcd->dump(level+1);
+    }
+    if (els) {
+        els->dump(level+1);
+    }
+};
+
+void Ifcd::dump(int level) const {
+    dump_indent(level);
+    std::cout << "If" << std::endl;
+    cond->dump(level+1);
+    body->dump(level+1);
+};
+
+void Else::dump(int level) const {
+    dump_indent(level);
+    std::cout << "Else" << std::endl;
+    body->dump(level+1);
+};
+
+
+void Elif::dump(int level) const {
+    dump_indent(level);
+    std::cout << "Elif" << std::endl;
+    cond->dump(level+1);
+    body->dump(level+1);
+};
+
+
+void Whil::dump(int level) const {
+    dump_indent(level);
+    std::cout << "While" << std::endl;
+    cond->dump(level+1);
+    body->dump(level+1);
+};
+
+void Rept::dump(int level) const {
+    dump_indent(level);
+    std::cout << "Repeat" << std::endl;
+    body->dump(level+1);
+    std::cout << "Until" << std::endl;
+    cond->dump(level+1);
+};
+
+
+void FRtn::dump(int level) const {
+    dump_indent(level);
+    std::cout << "Return" << std::endl;
+    expn->dump(level+1);
+};
+
+void PRtn::dump(int level) const {
+    dump_indent(level);
+    std::cout << "Return" << std::endl;
+};
+
+void Inif::dump(int level) const {
+    std::cout << "Inif" << std::endl;
+    if_br->dump(level+1);
+    cond->dump(level+1);
+    else_br->dump(level+1);
+}
+
+void Negt::dump(int level) const {
+    std::cout << "not ";
+    expn->dump(level+1);
+}
+
+void Imus::dump(int level) const {
+    std::cout << "-";
+    expn->dump(level+1);
+}
+
+void Conj::dump(int level) const {
+    lft->dump(level+1);
+    std::cout << " and ";
+    rht->dump(level+1);
+}
+
+void Disj::dump(int level) const {
+    lft->dump(level+1);
+    std::cout << " or ";
+    rht->dump(level+1);
+}
+
+void Cmlt::dump(int level) const {
+    lft->dump(level+1);
+    std::cout << " < ";
+    rht->dump(level+1);
+}
+
+void Cmgt::dump(int level) const {
+    lft->dump(level+1);
+    std::cout << " > ";
+    rht->dump(level+1);
+}
+
+void Cmeq::dump(int level) const {
+    lft->dump(level+1);
+    std::cout << " == ";
+    rht->dump(level+1);
+}
+
+void Cmle::dump(int level) const {
+    lft->dump(level+1);
+    std::cout << " <= ";
+    rht->dump(level+1);
+}
+
+void Cmge::dump(int level) const {
+    lft->dump(level+1);
+    std::cout << " >= ";
+    rht->dump(level+1);
+}
+
+
+
 void Prgm::dump(int level) const {
     dump_indent(level);
     std::cout << "PRGM" << std::endl;
-    for (std::pair<Name,Defn_ptr> dfpr : defs) {
-        dfpr.second->dump(level+1);
+    for (auto defn : defs) {
+        defn.second->dump(level+1);
     }
-    main->dump(level+1);
+
+    if (main) {
+        main->dump(level+1);
+    }
 }
 
 void Defn::dump(int level) const {
     dump_indent(level);
     std::cout << "DEFN" << std::endl;
+    // Your code goes here.
+    dump_indent(level+1);
+    std::cout << "Args" << std::endl;
+    dump_indent(level + 2);
+    std::cout << name << std::endl;
+    dump_indent(level + 1);
+    dump_args(args, std::cout);
+    std::cout << std::endl;
+    body->dump(level+1);
+}
+
+void PCll::dump(int level) const {
+    dump_indent(level);
+    std::cout << "PCALL" << std::endl;
     dump_indent(level+1);
     std::cout << name << std::endl;
-    for (unsigned int i=0; i < arity(); i++) {
-        dump_indent(level+1);
-        SymInfo_ptr frml = formal(i);
-        std::cout << frml->name << ":" << type_name(frml->type) << std::endl;
-    }
-    body->dump(level+1);
+    dump_args(args, level + 1);
+    std::cout << std::endl;
+}
+
+void FCll::dump(int level) const {
+    dump_indent(level);
+    std::cout << "FCALL" << std::endl;
+    dump_indent(level+1);
+    std::cout << name << std::endl;
+    dump_args(args, level + 1);
+    std::cout << std::endl;
 }
 
 void Blck::dump(int level) const {
@@ -784,16 +999,6 @@ void Blck::dump(int level) const {
     for (Stmt_ptr stmt : stmts) {
         stmt->dump(level+1);
     }
-}
-
-void Ntro::dump(int level) const {
-    dump_indent(level);
-    std::cout << "NTRO" << std::endl;
-    dump_indent(level+1);
-    std::cout << name << std::endl;
-    dump_indent(level+1);
-    std::cout << type_name(type) << std::endl;
-    expn->dump(level+1);
 }
 
 void Asgn::dump(int level) const {
@@ -807,48 +1012,14 @@ void Asgn::dump(int level) const {
 void Prnt::dump(int level) const {
     dump_indent(level);
     std::cout << "PRNT" << std::endl;
-    expn->dump(level+1);
-}
-
-void PRtn::dump(int level) const {
-    dump_indent(level);
-    std::cout << "PRTN" << std::endl;
-}
-
-void FRtn::dump(int level) const {
-    dump_indent(level);
-    std::cout << "FRTN" << std::endl;
-    expn->dump(level+1);
-}
-
-void PCll::dump(int level) const {
-    dump_indent(level);
-    std::cout << "PCLL" << std::endl;
-    dump_indent(level+1);
-    std::cout << name << std::endl;
-    for (Expn_ptr expn : params) {
-         expn->dump(level+1);
+    for (auto expn : expns) {
+        expn->dump(level+1);
     }
 }
 
 void Pass::dump(int level) const {
     dump_indent(level);
     std::cout << "PASS" << std::endl;
-}
-
-void IfEl::dump(int level) const {
-    dump_indent(level);
-    std::cout << "IFEL" << std::endl;
-    cndn->dump(level+1);
-    then_blck->dump(level+1);
-    else_blck->dump(level+1);
-}
-
-void Whle::dump(int level) const {
-    dump_indent(level);
-    std::cout << "WHLE" << std::endl;
-    cndn->dump(level+1);
-    blck->dump(level+1);
 }
 
 void Plus::dump(int level) const {
@@ -886,47 +1057,6 @@ void IMod::dump(int level) const {
     rght->dump(level+1);
 }
 
-void Equl::dump(int level) const {
-    dump_indent(level);
-    std::cout << "EQUL" << std::endl;
-    left->dump(level+1);
-    rght->dump(level+1);
-}
-
-void LsEq::dump(int level) const {
-    dump_indent(level);
-    std::cout << "LSEQ" << std::endl;
-    left->dump(level+1);
-    rght->dump(level+1);
-}
-
-void Less::dump(int level) const {
-    dump_indent(level);
-    std::cout << "Less" << std::endl;
-    left->dump(level+1);
-    rght->dump(level+1);
-}
-
-void And::dump(int level) const {
-    dump_indent(level);
-    std::cout << "AND " << std::endl;
-    left->dump(level+1);
-    rght->dump(level+1);
-}
-
-void Or::dump(int level) const {
-    dump_indent(level);
-    std::cout << "OR  " << std::endl;
-    left->dump(level+1);
-    rght->dump(level+1);
-}
-
-void Not::dump(int level) const {
-    dump_indent(level);
-    std::cout << "NOT " << std::endl;
-    expn->dump(level+1);
-}
-
 void Ltrl::dump(int level) const {
     dump_indent(level);
     std::cout << "LTRL" << std::endl;
@@ -959,12 +1089,3 @@ void StrC::dump(int level) const {
     expn->dump(level+1);
 }
 
-void FCll::dump(int level) const {
-    dump_indent(level);
-    std::cout << "FCLL" << std::endl;
-    dump_indent(level+1);
-    std::cout << name << std::endl;
-    for (Expn_ptr expn : params) {
-         expn->dump(level+1);
-    }
-}

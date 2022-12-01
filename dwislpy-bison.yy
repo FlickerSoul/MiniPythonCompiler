@@ -69,6 +69,7 @@
 %token               PASS "pass"
 %token               PRNT "print"
 %token               INPT "input"
+%token               BOOL "bool"
 %token               INTC "int"
 %token               STRC "str"
 %token               ASGN "="
@@ -93,13 +94,14 @@
 %type <Defn_ptr> defn
 %type <Blck_ptr> nest
 %type <Blck_ptr> blck
-%type <Args>     args
+%type <Fmag>     fmag
 %type <Args_vec> expns
 %type <Stmt_vec> stms
 %type <Stmt_ptr> stmt
 %type <Expn_ptr> expn
 %type <Ifcd_vec> elifb
 %type <Else_ptr> elseb
+%type <Type> type
 
 %%
 
@@ -134,35 +136,47 @@ prgm:
 defs:
     defs defn {
         Defs ds = $1;
-        ds.push_back($2);
+        ds[$2->name] = $2;
         $$ = ds;
     }
 |   defn {
-        $$ = Defs {$1};
+        Defs ds {};
+        ds[$1->name] = $1;
+        $$ = ds;
     }
 |   {
         $$ = Defs {};
     }
 ;
 
-args:
-    args COMA NAME {
-        Args as = $1;
-        as.push_back($3);
-        $$ = as;
-    }
-|   NAME {
-        $$ = Args {$1};
-    }
-|   {
-        Args as {};
-        $$ = as;
-    }
+type:
+  INTC {
+    $$ = INT_T;
+  }
+| STRC {
+    $$ = STR_T;
+  }
+| BOOL {
+    $$ = BOOL_T;
+  }
+| NONE {
+    $$ = NONE_T;
+  }
 ;
 
+fmag:
+   fmag COMA NAME COLN type {
+       $$ = $1;
+       $$.add_frml($3, $5);
+   }
+|  NAME COLN type {
+       $$ = Fmag {};
+       $$.add_frml($1, $3);
+    }
+
 defn: 
-    DEFF NAME LPAR args RPAR COLN EOLN nest {
-        $$ = Defn_ptr { new Defn { $2, $4, $8, $8->where() } };
+    DEFF NAME LPAR fmag RPAR ARRW type COLN EOLN nest {
+        $$ = Defn_ptr { new Defn { $2, $4, $10, $7, $10->where() } };
     }
 ;
 
@@ -196,17 +210,19 @@ stms:
 ;
   
 stmt: 
-  expn EOLN{
-    $1->make_stmt();
-    $$ = $1;
+  NAME LPAR expns RPAR EOLN {
+    $$ = PCll_ptr { new PCll {$1, $3, lexer.locate(@1)} };
   }
-
 | REPT COLN EOLN nest UNTL expn EOLN {
     $$ = Rept_ptr { new Rept { $6, $4, lexer.locate(@1) } };
   }
 
+| NAME COLN type ASGN expn EOLN {
+      $$ = Ntro_ptr { new Ntro {$1,$3,$5,lexer.locate(@2)} };
+}
+
 | NAME ASGN expn EOLN {
-      $$ = Asgn_ptr { new Asgn {$1,$3,lexer.locate(@2)} };
+      $$ = Asgn_ptr { new Asgn {$1, $3,lexer.locate(@2)} };
   }
 
 | NAME PLEQ expn EOLN {
@@ -226,19 +242,19 @@ stmt:
       $$ = Whil_ptr { new Whil {$2, $5, lexer.locate(@1)} };
   }
 
-| RTRN expn EOLN {
-      $$ = Rtrn_ptr { new Rtrn {$2, lexer.locate(@1)} };
-  }
-
 | RTRN EOLN {
-      $$ = Rtrn_ptr { new Rtrn {lexer.locate(@1)} };
+      $$ = PRtn_ptr { new PRtn {lexer.locate(@1)} };
+}
+
+| RTRN expn EOLN {
+      $$ = FRtn_ptr { new FRtn {$2, lexer.locate(@1)} };
   }
 
 | PASS EOLN {
       $$ = Pass_ptr { new Pass {lexer.locate(@1)} };
   }
 | PRNT LPAR expns RPAR EOLN {
-      $$ = Prnt_ptr { new Prnt {$3,lexer.locate(@1)} };
+      $$ = Prnt_ptr { new Prnt {$3, lexer.locate(@1)} };
   }
 ;
 
@@ -276,7 +292,7 @@ expns:
 
 expn:
   NAME LPAR expns RPAR {
-    $$ = Call_ptr { new Call {$1, $3, lexer.locate(@1)} };
+    $$ = FCll_ptr { new FCll { $1, $3, lexer.locate(@2) } };
   }
 
 | expn IFCD expn ELSE expn {

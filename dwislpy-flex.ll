@@ -451,12 +451,10 @@ WSPC    {INDT}
     return issue(token::Token_CMGE, yytext ,loc);
 }
 
-<MID_LINE>"->"{
+<MID_LINE>"->" {
     // Handle the `->` keyword.
     return issue(token::Token_ARRW, yytext ,loc);
 }
-
-
 <MID_LINE>"=" {
     return issue(token::Token_ASGN,yytext,loc);
 }
@@ -503,6 +501,10 @@ WSPC    {INDT}
     
 <MID_LINE>int {
     return issue(token::Token_INTC,yytext,loc);
+}
+
+<MID_LINE>bool {
+    return issue(token::Token_BOOL,yytext,loc);
 }
     
 <MID_LINE>str {

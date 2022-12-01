@@ -59,13 +59,21 @@
 // indeed the case, reports that its resulting value will be of type
 // Type { IntTy {} }.
 //
+//
+class TypeTy {};
 
-class IntTy {};
-class StrTy {};
-class BoolTy {};
-class NoneTy {};
+class IntTy : public TypeTy {};
+class StrTy : public TypeTy {};
+class BoolTy : public TypeTy {};
+class NoneTy : public TypeTy {};
 typedef std::variant<IntTy,StrTy,BoolTy,NoneTy> Type;
 
+extern const Type BOOL_T;
+extern const Type INT_T;
+extern const Type STR_T;
+extern const Type NONE_T;
+
+std::string get_type_str(Type type);
 // s = type_name(t)
 //
 // Used to report the DWISLPY type of variables, values, and expressions.
@@ -126,7 +134,6 @@ public:
     Type type;
 };
 typedef std::variant<Void,VoidOr,Type> Rtns;
-
 
 // * * * * *
 // 
