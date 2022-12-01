@@ -117,6 +117,7 @@ Type type_of(Rtns rtns) {
 
 void Defn::chck(Defs& defs) {
     Rtns rtns = body->chck(Rtns{ret_type}, defs, args);
+
     if (std::holds_alternative<Void>(rtns)) {
         throw DwislpyError(body->where(), "Definition body never returns.");
     }
@@ -130,7 +131,9 @@ void Defn::chck(Defs& defs) {
 }
 
 Rtns Blck::chck(Rtns expd, Defs& defs, SymT& symt) {
-    
+
+    symt.mark();
+
     // Scan through the statements and check their return behavior.
     Rtns rtns = Void {};
     for (Stmt_ptr stmt : stmts) {
@@ -144,7 +147,8 @@ Rtns Blck::chck(Rtns expd, Defs& defs, SymT& symt) {
                 throw DwislpyError(stmt->where(), "Statement returns " + get_type_str(type_of(stmt_rtns)) + " but previous statement returns " + get_type_str(type_of(rtns)) + ".");
             }
 
-            return stmt_rtns;
+            rtns = stmt_rtns;
+            break;
         } else if (std::holds_alternative<VoidOr>(stmt_rtns)) {
             if (std::holds_alternative<Void>(rtns)) {
                 rtns = stmt_rtns;
@@ -155,6 +159,8 @@ Rtns Blck::chck(Rtns expd, Defs& defs, SymT& symt) {
             }
         }
     }            
+
+    symt.pop_until_mark();
 
     return rtns;
 }
@@ -187,8 +193,11 @@ Rtns Prnt::chck([[maybe_unused]] Rtns expd, Defs& defs, SymT& symt) {
 }
 
 Rtns Ntro::chck([[maybe_unused]] Rtns expd, Defs& defs, SymT& symt) {
-    auto expn_type = expn->chck(defs, symt);
+    if (symt.is_redefining(name)) {
+        throw DwislpyError(where(), "Variable '" + name + "' already introduced.");
+    }
 
+    auto expn_type = expn->chck(defs, symt);
     symt.add_locl(name, expn_type);
     return Rtns {Void {}}; 
 }
@@ -247,7 +256,7 @@ Rtns PCll::chck([[maybe_unused]] Rtns expd, Defs& defs, SymT& symt) {
         auto fm_arg_tp = fn->args.get_frml(i)->type;
         auto ac_arg_tp = args[i]->chck(defs, symt);
         if (fm_arg_tp != ac_arg_tp) {
-            throw DwislpyError(where(), "The argument at " + std::to_string(i) + " should have type " + get_type_str(fm_arg_tp) + "but got " + get_type_str(ac_arg_tp));
+            throw DwislpyError(where(), "The argument at " + std::to_string(i) + " should have type " + get_type_str(fm_arg_tp) + " but got " + get_type_str(ac_arg_tp));
         }
     }
 
@@ -432,8 +441,11 @@ Type Imus::chck(Defs &defs, SymT &symt) {
     }
 }
 
-Rtns Pleq::chck(Rtns expd, Defs& defs, SymT& symt) {
-    // Doesn't check subexpressions.
+Rtns Pleq::chck([[maybe_unused]]Rtns expd, Defs& defs, SymT& symt) {
+    if (!symt.has_info(name)) {
+        std::string msg = "The variable " + name + " is not defined.";
+        throw DwislpyError { where(), msg };
+    }
     auto stored = symt.get_info(name);
     Type left_ty = stored->type;
     Type rght_ty = expn->chck(defs,symt);
@@ -448,8 +460,11 @@ Rtns Pleq::chck(Rtns expd, Defs& defs, SymT& symt) {
     }
 }
 
-Rtns Mneq::chck(Rtns expd, Defs& defs, SymT& symt) {
-    // Doesn't check subexpressions.
+Rtns Mneq::chck([[maybe_unused]]Rtns expd, Defs& defs, SymT& symt) {
+    if (!symt.has_info(name)) {
+        std::string msg = "The variable " + name + " is not defined.";
+        throw DwislpyError { where(), msg };
+    }
     auto stored = symt.get_info(name);
     Type left_ty = stored->type;
     Type rght_ty = expn->chck(defs,symt);

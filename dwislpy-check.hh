@@ -38,12 +38,14 @@
 // variable.
 //
 
+#include <algorithm>
 #include <iostream>
 #include <variant>
 #include <string>
 #include <vector>
 #include <memory>
 #include <unordered_map>
+#include <deque>
 
 // * * * * *
 //
@@ -195,34 +197,63 @@ typedef std::shared_ptr<SymInfo> SymInfo_ptr;
 //
 class SymT {
 public:
-    SymT() : sym_table {}, formals {} { }
+    SymT() : sym_tables { {} }, formals {} { }
     std::string add_frml(std::string nm, Type ty) {
-        sym_table[nm] = SymInfo_ptr{ new SymInfo {nm, ty, 0, FRML} };
+        sym_tables.front()[nm] = SymInfo_ptr{ new SymInfo {nm, ty, 0, FRML} };
         formals.push_back(nm);
         return nm;
     }
     std::string add_locl(std::string nm, Type ty) {
-        sym_table[nm] = SymInfo_ptr{ new SymInfo {nm, ty, sym_id++, FRML} };
+        sym_tables.front()[nm] = SymInfo_ptr{ new SymInfo {nm, ty, sym_id++, FRML} };
         return nm;
     }
     std::string add_temp(std::string nm, Type ty) {
-        sym_table[nm] = SymInfo_ptr{ new SymInfo {nm, ty, sym_id++, TEMP} };
+        sym_tables.front()[nm] = SymInfo_ptr{ new SymInfo {nm, ty, sym_id++, TEMP} };
         return nm;
     }
     bool has_info(std::string nm) const {
-        return (sym_table.count(nm) > 0);
+        return std::any_of(sym_tables.begin(), sym_tables.end(),
+            [&nm](const std::unordered_map<std::string,SymInfo_ptr> &sym_table) {
+                return sym_table.find(nm) != sym_table.end();
+            });
     }
     SymInfo_ptr get_info(std::string nm) const {
-        return sym_table.at(nm);
+        for (auto sym_table : sym_tables) {
+            if (sym_table.count(nm))
+                return sym_table.at(nm);
+        }
+
+        throw std::runtime_error("No symbol table entry for " + nm);
     }
     SymInfo_ptr get_frml(int i) const {
-        return sym_table.at(formals[i]);
+        return this->get_info(formals[i]);
     }
     unsigned int get_frmls_size(void) const {
         return formals.size();
     }
+    void mark(void) {
+        sym_tables.push_front( {} );
+    }
+    void pop_until_mark(void) {
+        sym_tables.pop_front();
+    }
+
+    void output(std::ostream &out) const {
+        size_t i = 0;
+        for (auto sym_table : sym_tables) {
+            out << "Symbol table " << i++ << std::endl;
+            for (auto sym : sym_table) {
+                out << sym.first << " " << sym.second->identifier << " " << get_type_str(sym.second->type) << " " << sym.second->kind << std::endl;
+            }
+            out << std::endl;
+        }
+    }
+
+    bool is_redefining(std::string nm) const {
+        return sym_tables.front().count(nm) > 0;
+    }
 private:
-    std::unordered_map<std::string, SymInfo_ptr> sym_table;
+    std::deque<std::unordered_map<std::string, SymInfo_ptr>> sym_tables;
     std::vector<std::string> formals;
     int sym_id = 0;
 };

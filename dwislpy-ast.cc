@@ -1,5 +1,6 @@
 #include <optional>
 #include <string>
+#include <variant>
 #include <vector>
 #include <unordered_map>
 #include <memory>
@@ -356,7 +357,16 @@ Valu Tmes::eval(const Defs& defs, const Ctxt& ctxt) const {
         int ln = std::get<int>(lv);
         int rn = std::get<int>(rv);
         return Valu {ln * rn};
-    } else {
+    } else if (std::holds_alternative<std::string>(lv) && std::holds_alternative<int>(rv)) {
+        std::string ln = std::get<std::string>(lv);
+        int rn = std::get<int>(rv);
+        std::stringstream ss; 
+        for (unsigned int i = 0; i < rn; i++) {
+            ss << ln;
+        }
+        return Valu {ss.str()};
+    } 
+    else {
         // Exercise: make this work for (int,str) and (str,int).
         std::string msg = "Run-time error: wrong operand type for times.";
         throw DwislpyError { where(), msg };
@@ -591,7 +601,7 @@ void Cmlt::output(std::ostream& os) const {
     
 void Cmgt::output(std::ostream& os) const {
     this->lft->output(os);
-    os << " < ";
+    os << " > ";
     this->rht->output(os);
 }
     
@@ -619,6 +629,7 @@ void Prgm::output(std::ostream& os) const {
         defn.second->output(os);
     }
     main->output(os);
+    os << std::endl;
 }
 
 void Defn::output(std::ostream& os) const {
@@ -628,11 +639,11 @@ void Defn::output(std::ostream& os) const {
 void dump_args(const Fmag& args, std::ostream& os) {
     if (args.get_frmls_size()) {
         auto arg = args.get_frml(0);
-        os << arg->name << std::endl;
-        os << get_type_str(arg->type) << std::endl;
+        os << arg->name << ": ";
+        os << get_type_str(arg->type);
         for (size_t index = 1; index < args.get_frmls_size(); index++) {
-            os << arg->name << std::endl;
-            os << get_type_str(arg->type) << std::endl;
+            os << ", " << arg->name << ": ";
+            os << get_type_str(arg->type);
         }
     }
 }
@@ -959,6 +970,8 @@ void Prgm::dump(int level) const {
     if (main) {
         main->dump(level+1);
     }
+
+    std::cout << std::endl;
 }
 
 void Defn::dump(int level) const {
