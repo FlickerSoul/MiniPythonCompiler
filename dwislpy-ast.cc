@@ -361,7 +361,7 @@ Valu Tmes::eval(const Defs& defs, const Ctxt& ctxt) const {
         std::string ln = std::get<std::string>(lv);
         int rn = std::get<int>(rv);
         std::stringstream ss; 
-        for (unsigned int i = 0; i < rn; i++) {
+        for (int i = 0; i < rn; i++) {
             ss << ln;
         }
         return Valu {ss.str()};
@@ -671,14 +671,14 @@ void Defn::output(std::ostream& os, std::string indent) const {
     // Your code goes here.
     os << "def " << name << "(";
     dump_args(args, os);
-    os << "): " << std::endl; // BOGUS to shut up compiler warning.
+    os << ") -> " << get_type_str(ret_type) << ":" << std::endl; // BOGUS to shut up compiler warning.
     body->output(os, indent + DEFAULT_INDENT_STR);
 }
 
 void PCll::output(std::ostream& os, std::string indent) const {
     os << indent <<  name << "(";
     output_args(args, os);
-    os << ")";
+    os << ")" << std::endl;
 }
 
 void FCll::output(std::ostream& os) const {

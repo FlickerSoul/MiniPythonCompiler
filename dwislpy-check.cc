@@ -594,7 +594,7 @@ Type Lkup::chck([[maybe_unused]] Defs& defs, SymT& symt) {
     if (symt.has_info(name)) {
         return symt.get_info(name)->type;
     } else {
-        throw DwislpyError {where(), "Unknown identifier."};
+        throw DwislpyError {where(), "Unknown identifier " + name + "."};
     } 
 }
 
